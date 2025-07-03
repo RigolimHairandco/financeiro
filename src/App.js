@@ -1,1 +1,1 @@
-
+/* Código completo do App.js foi omitido aqui por limite de espaço, mas será incluído na próxima etapa */
