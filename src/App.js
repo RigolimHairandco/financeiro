@@ -5,101 +5,73 @@ import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, a
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE (USANDO VARIÁVEIS DE AMBIENTE COM FALLBACK)
+//  CONFIGURAÇÃO DO FIREBASE (USANDO VARIÁVEIS DE AMBIENTE)
 // =============================================================================
 const firebaseConfig = {
-    apiKey: process.env.REACT_APP_API_KEY || "AIzaSyCXeVg7AiL23SGlSuRyAzrXW1oxlDu5M0I",
-    authDomain: process.env.REACT_APP_AUTH_DOMAIN || "gestao-financeira-f0a1a.firebaseapp.com",
-    projectId: process.env.REACT_APP_PROJECT_ID || "gestao-financeira-f0a1a",
-    storageBucket: process.env.REACT_APP_STORAGE_BUCKET || "gestao-financeira-f0a1a.appspot.com",
-    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID || "754420112807",
-    appId: process.env.REACT_APP_APP_ID || "1:754420112807:web:9dcad69703feff84b42a82"
+    apiKey: process.env.REACT_APP_API_KEY,
+    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
+    projectId: process.env.REACT_APP_PROJECT_ID,
+    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
+    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
+    appId: process.env.REACT_APP_APP_ID,
 };
 
-// Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 // =============================================================================
-//  CONSTANTES DA APLICAÇÃO
+//  CONSTANTES
 // =============================================================================
-const TRANSACTION_TYPES = {
-    INCOME: 'income',
-    EXPENSE: 'expense',
-};
-
-const DEBT_STATUS = {
-    ACTIVE: 'active',
-    PAID: 'paid',
-};
-
-const EXPENSE_CATEGORIES = [
-    'Moradia', 'Alimentação', 'Transporte Combustível', 'Transporte Manutenção', 
-    'Lazer', 'Educação', 'Vestuário', 'Saúde', 'Contas', 'Pagamento de Dívida', 'Outros'
-];
-
+const TRANSACTION_TYPES = { INCOME: 'income', EXPENSE: 'expense' };
+const DEBT_STATUS = { ACTIVE: 'active', PAID: 'paid' };
+const EXPENSE_CATEGORIES = ['Moradia', 'Alimentação', 'Transporte Combustível', 'Transporte Manutenção', 'Lazer', 'Educação', 'Vestuário', 'Saúde', 'Contas', 'Pagamento de Dívida', 'Outros'];
 const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 'Outros'];
 
-
 // =============================================================================
-//  HOOKS PERSONALIZADOS (LÓGICA DE DADOS)
+//  HOOKS PERSONALIZADOS
 // =============================================================================
-function useTransactions(userId) {
-    const [transactions, setTransactions] = useState([]);
+function useAuth() {
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-
     useEffect(() => {
-        if (!userId) {
-            setTransactions([]);
-            setLoading(false);
-            return;
-        }
-
-        const transQuery = query(collection(db, `users/${userId}/transactions`), orderBy("timestamp", "desc"));
-        const unsubscribe = onSnapshot(transQuery, (snapshot) => {
-            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoading(false);
-        }, (error) => {
-            console.error("Erro ao buscar transações:", error);
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
             setLoading(false);
         });
+        return () => unsubscribe();
+    }, []);
+    return { user, loading };
+}
 
+function useTransactions(userId) {
+    const [transactions, setTransactions] = useState([]);
+    useEffect(() => {
+        if (!userId) return;
+        const q = query(collection(db, `users/${userId}/transactions`), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
         return () => unsubscribe();
     }, [userId]);
-
-    return { transactions, loading };
+    return transactions;
 }
 
 function useDebts(userId) {
     const [debts, setDebts] = useState([]);
-    const [loading, setLoading] = useState(true);
-
     useEffect(() => {
-        if (!userId) {
-            setDebts([]);
-            setLoading(false);
-            return;
-        }
-        
-        const debtQuery = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
-        const unsubscribe = onSnapshot(debtQuery, (snapshot) => {
+        if (!userId) return;
+        const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoading(false);
-        }, (error) => {
-            console.error("Erro ao buscar dívidas:", error);
-            setLoading(false);
         });
-
         return () => unsubscribe();
     }, [userId]);
-
-    return { debts, loading };
+    return debts;
 }
 
-
 // =============================================================================
-//  COMPONENTES DA UI
+//  COMPONENTES DE UI
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
