@@ -5,7 +5,7 @@ import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, a
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE
+//  CONFIGURAÇÃO DO FIREBASE revisado pelo chatgbt
 // =============================================================================
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
@@ -64,7 +64,7 @@ function useDebts(userId) {
 }
 
 // =============================================================================
-//  COMPONENTES DE UI
+//  COMPONENTES DE UI (Definidos antes de serem usados)
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
