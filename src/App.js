@@ -5,7 +5,7 @@ import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, a
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE revisado pelo chatgbt
+//  CONFIGURAÇÃO DO FIREBASE V3
 // =============================================================================
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
@@ -31,6 +31,19 @@ const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 
 // =============================================================================
 //  HOOKS PERSONALIZADOS
 // =============================================================================
+function useAuth() {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+    return { user, loading };
+}
+
 function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
