@@ -31,23 +31,13 @@ const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 
 // =============================================================================
 //  HOOKS PERSONALIZADOS
 // =============================================================================
-function useAuth() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
-    return { user, loading };
-}
-
 function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
-        if (!userId) return;
+        if (!userId) {
+            setTransactions([]);
+            return;
+        }
         const q = query(collection(db, `users/${userId}/transactions`), orderBy("timestamp", "desc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -60,7 +50,10 @@ function useTransactions(userId) {
 function useDebts(userId) {
     const [debts, setDebts] = useState([]);
     useEffect(() => {
-        if (!userId) return;
+        if (!userId) {
+            setDebts([]);
+            return;
+        }
         const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -71,7 +64,7 @@ function useDebts(userId) {
 }
 
 // =============================================================================
-//  COMPONENTES DE UI
+//  COMPONENTES DE UI (Definidos antes de serem usados)
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
