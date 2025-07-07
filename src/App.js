@@ -64,7 +64,7 @@ function useDebts(userId) {
 }
 
 // =============================================================================
-//  COMPONENTES DE UI (Definidos antes de serem usados)
+//  COMPONENTES DE UI
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
