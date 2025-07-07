@@ -191,21 +191,21 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const [view, setView] = useState('dashboard');
 
     const handleSaveTransaction = async (data, id) => {
-        const batch = db.batch();
+        const batch = writeBatch(db);
         try {
             if (id) {
                 if(data.linkedDebtId) {
                     setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova.");
                     return;
                 }
-                const transRef = db.collection(`users/${user.uid}/transactions`).doc(id);
+                const transRef = doc(db, `users/${user.uid}/transactions`, id);
                 batch.update(transRef, data);
             } else {
-                const newTransRef = db.collection(`users/${user.uid}/transactions`).doc();
+                const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
                 batch.set(newTransRef, data);
                 if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) {
-                    const debtRef = db.collection(`users/${user.uid}/debts`).doc(data.linkedDebtId);
-                    const debtDoc = await debtRef.get();
+                    const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
+                    const debtDoc = await getDoc(debtRef);
                     if(debtDoc.exists()){
                         const debtData = debtDoc.data();
                         const newPaidAmount = debtData.paidAmount + data.amount;
@@ -223,7 +223,7 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
 
     const handleSaveDebt = async (data) => {
         try {
-            await db.collection(`users/${user.uid}/debts`).add(data);
+            await addDoc(collection(db, `users/${user.uid}/debts`), data);
         } catch (e) {
             console.error("Erro ao guardar dívida:", e);
             setAlertMessage("Ocorreu um erro ao guardar a dívida.");
@@ -235,14 +235,14 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const handleDelete = async () => {
         if (!itemToDelete.id) return;
         const { id, type, data } = itemToDelete;
-        const batch = db.batch();
+        const batch = writeBatch(db);
         const path = `users/${user.uid}/${type}s`;
-        const docRef = db.collection(path).doc(id);
+        const docRef = doc(db, path, id);
 
         try {
             if (type === 'transaction' && data?.linkedDebtId) {
-                const debtRef = db.collection(`users/${user.uid}/debts`).doc(data.linkedDebtId);
-                const debtDoc = await debtRef.get();
+                const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
+                const debtDoc = await getDoc(debtRef);
                 if (debtDoc.exists()) {
                     const debtData = debtDoc.data();
                     const newPaidAmount = debtData.paidAmount - data.amount;
@@ -252,8 +252,8 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                     });
                 }
             } else if (type === 'debt') {
-                const transQuery = db.collection(`users/${user.uid}/transactions`).where("linkedDebtId", "==", id);
-                const transSnapshot = await transQuery.get();
+                const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id));
+                const transSnapshot = await getDocs(transQuery);
                 if (!transSnapshot.empty) {
                     setAlertMessage("Não é possível apagar uma dívida que já possui pagamentos registados. Apague primeiro os pagamentos.");
                     setItemToDelete({id: null, type: null, data: null});
@@ -274,14 +274,14 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     
     const handleMakePayment = async (paymentAmount) => {
         if (!debtToPay || !paymentAmount || paymentAmount <= 0) return;
-        const batch = db.batch();
-        const newTransRef = db.collection(`users/${user.uid}/transactions`).doc();
+        const batch = writeBatch(db);
+        const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
         batch.set(newTransRef, { 
             description: `Pagamento: ${debtToPay.description}`, 
             amount: paymentAmount, type: TRANSACTION_TYPES.EXPENSE, category: 'Pagamento de Dívida', 
             timestamp: Timestamp.now(), linkedDebtId: debtToPay.id 
         });
-        const debtRef = db.collection(`users/${user.uid}/debts`).doc(debtToPay.id);
+        const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id);
         const newPaidAmount = debtToPay.paidAmount + paymentAmount;
         const newStatus = newPaidAmount >= debtToPay.totalAmount ? DEBT_STATUS.PAID : DEBT_STATUS.ACTIVE;
         batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
