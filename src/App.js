@@ -33,6 +33,7 @@ function useDebts(userId) {
 }
 
 // --- COMPONENTES DE UI ---
+// ATUALIZADO: Componente Icon com mais ícones
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
         wallet: <path d="M21 12v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1" />,
@@ -61,16 +62,19 @@ const Icon = ({ name, size = 24, className = '' }) => {
         plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
         tag: <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></>,
         moreHorizontal: <><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></>,
+        wrench: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
+        fuel: <><line x1="3" x2="15" y1="22" y2="22" /><line x1="4" x2="14" y1="9" y2="9" /><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18" /><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" /><path d="M4 13h6" /></>,
     };
     return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name.toLowerCase()] || <circle cx="12" cy="12" r="10" />}</svg>;
 };
 
-// ATUALIZADO: CategoryIcon com todos os mapeamentos
+// ATUALIZADO: CategoryIcon com os novos mapeamentos
 const CategoryIcon = ({ category }) => {
     const categoryIcons = {
         'Moradia': 'home',
         'Alimentação': 'utensils',
-        'Transporte': 'car',
+        'Transporte - Combustível': 'fuel',
+        'Transporte - Manutenção': 'wrench',
         'Lazer': 'popcorn',
         'Educação': 'graduationCap',
         'Vestuário': 'shirt',
@@ -98,11 +102,12 @@ const DebtForm = ({ onSave }) => { const [description, setDescription] = useStat
 const DebtItem = ({ debt, onPay, onDelete }) => { const { description, totalAmount, paidAmount } = debt; const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0; const remaining = totalAmount - paidAmount; return ( <li className="bg-slate-50 p-4 rounded-xl mb-3"><div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} / {totalAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span></div><div className="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div className="bg-teal-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div></div><div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div></li> ); };
 const Reports = ({ transactions }) => { const getMonthStartEnd = () => { const now = new Date(); const startDate = new Date(now.getFullYear(), now.getMonth(), 1); const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); return { start: startDate.toISOString().split('T')[0], end: endDate.toISOString().split('T')[0] }; }; const [startDate, setStartDate] = useState(getMonthStartEnd().start); const [endDate, setEndDate] = useState(getMonthStartEnd().end); const filteredTransactions = useMemo(() => { const start = new Date(startDate + 'T00:00:00'); const end = new Date(endDate + 'T23:59:59'); return transactions.filter(t => { const transDate = t.timestamp.toDate(); return transDate >= start && transDate <= end; }); }, [transactions, startDate, endDate]); const incomes = useMemo(() => filteredTransactions.filter(t => t.type === 'income'), [filteredTransactions]); const expenses = useMemo(() => filteredTransactions.filter(t => t.type === 'expense'), [filteredTransactions]); const totalIncome = useMemo(() => incomes.reduce((acc, t) => acc + t.amount, 0), [incomes]); const totalExpenses = useMemo(() => expenses.reduce((acc, t) => acc + t.amount, 0), [expenses]); const handlePrint = () => { window.print(); }; return ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><div className="bg-white p-6 rounded-2xl shadow-md no-print"><h2 className="text-2xl font-bold text-gray-800 mb-4">Relatório de Transações</h2><div className="flex flex-wrap items-center gap-4 mb-6"><div><label htmlFor="start-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Início</label><input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div><label htmlFor="end-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Fim</label><input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div className="self-end"><button onClick={handlePrint} className="flex items-center space-x-2 py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"><Icon name="printer" size={18} /><span>Imprimir</span></button></div></div></div><div className="mt-8 printable"><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-green-600 mb-4">Entradas</h3><ul className="space-y-2">{incomes.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Entradas:</span><span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-red-600 mb-4">Saídas</h3><ul className="space-y-2">{expenses.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Saídas:</span><span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div></div></div></main> ); };
 
+// ATUALIZADO: SettingsPage com as novas sugestões de transporte
 const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => {
     const [newExpenseCat, setNewExpenseCat] = useState('');
     const [newIncomeCat, setNewIncomeCat] = useState('');
 
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros'];
+    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros'];
     const incomeSuggestions = ['Salário', 'Freelance', 'Investimentos', 'Vendas', 'Outros'];
 
     const handleAddExpense = (e) => { e.preventDefault(); if (newExpenseCat.trim()) { onAddCategory('expenseCategories', newExpenseCat.trim()); setNewExpenseCat(''); } };
