@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { initializeApp } from 'firebase/app';
 
 // =============================================================================
 //  CONFIGURAÇÃO DO FIREBASE (Re-inicialização para este componente)
@@ -16,12 +16,11 @@ const firebaseConfig = {
 };
 
 // Inicializa uma instância secundária do Firebase para evitar conflitos
-// se o App.js também inicializar.
 let app;
 try {
-  app = initializeApp(firebaseConfig);
+  app = initializeApp(firebaseConfig, "financialManager");
 } catch (e) {
-  app = initializeApp(firebaseConfig, "secondary");
+  app = initializeApp(firebaseConfig);
 }
 const db = getFirestore(app);
 
@@ -69,13 +68,11 @@ function useDebts(userId) {
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
         wallet: <path d="M21 12v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1" />,
-        eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
-        eyeOff: <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></>,
+        logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
         arrowUpCircle: <><circle cx="12" cy="12" r="10" /><path d="m8 12 4-4 4 4" /><path d="M12 16V8" /></>,
         arrowDownCircle: <><circle cx="12" cy="12" r="10" /><path d="m8 12 4 4 4-4" /><path d="M12 8v8" /></>,
         dollarSign: <><line x1="12" x2="12" y1="2" y2="22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></>,
         banknote: <><rect width="20" height="12" x="2" y="6" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></>,
-        logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
         home: <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
         utensils: <><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z" /></>,
         car: <><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L2.1 12.9A3 3 0 0 0 2 15v5c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path d="M9 17h6" /><circle cx="17" cy="17" r="2" /></>,
@@ -102,11 +99,185 @@ export default function FinancialManager({ user, onLogout, setAlertMessage }) {
     const transactions = useTransactions(user.uid);
     const debts = useDebts(user.uid);
     
-    // ... (Toda a lógica do FinancialManager que tínhamos no App.js vem aqui)
+    const [transactionToEdit, setTransactionToEdit] = useState(null);
+    const [itemToDelete, setItemToDelete] = useState({id: null, type: null, data: null});
+    const [filterPeriod, setFilterPeriod] = useState('month');
+    const [debtToPay, setDebtToPay] = useState(null);
+    const [view, setView] = useState('dashboard');
+
+    const handleSaveTransaction = async (data, id) => {
+        const batch = writeBatch(db);
+        try {
+            if (id) {
+                if(data.linkedDebtId) {
+                    setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova.");
+                    return;
+                }
+                const transRef = doc(db, `users/${user.uid}/transactions`, id);
+                batch.update(transRef, data);
+            } else {
+                const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
+                batch.set(newTransRef, data);
+                if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) {
+                    const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
+                    const debtDoc = await getDoc(debtRef);
+                    if(debtDoc.exists()){
+                        const debtData = debtDoc.data();
+                        const newPaidAmount = debtData.paidAmount + data.amount;
+                        const newStatus = newPaidAmount >= debtData.totalAmount ? DEBT_STATUS.PAID : DEBT_STATUS.ACTIVE;
+                        batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
+                    }
+                }
+            }
+            await batch.commit();
+        } catch (e) {
+            console.error("Erro ao guardar transação:", e);
+            setAlertMessage("Ocorreu um erro ao guardar a transação.");
+        }
+    };
+
+    const handleSaveDebt = async (data) => {
+        try {
+            await addDoc(collection(db, `users/${user.uid}/debts`), data);
+        } catch (e) {
+            console.error("Erro ao guardar dívida:", e);
+            setAlertMessage("Ocorreu um erro ao guardar a dívida.");
+        }
+    };
+
+    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
+
+    const handleDelete = async () => {
+        if (!itemToDelete.id) return;
+        const { id, type, data } = itemToDelete;
+        const batch = writeBatch(db);
+        const path = `users/${user.uid}/${type}s`;
+        const docRef = doc(db, path, id);
+
+        try {
+            if (type === 'transaction' && data?.linkedDebtId) {
+                const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
+                const debtDoc = await getDoc(debtRef);
+                if (debtDoc.exists()) {
+                    const debtData = debtDoc.data();
+                    const newPaidAmount = debtData.paidAmount - data.amount;
+                    batch.update(debtRef, { 
+                        paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, 
+                        status: DEBT_STATUS.ACTIVE 
+                    });
+                }
+            } else if (type === 'debt') {
+                const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id));
+                const transSnapshot = await getDocs(transQuery);
+                if (!transSnapshot.empty) {
+                    setAlertMessage("Não é possível apagar uma dívida que já possui pagamentos registados. Apague primeiro os pagamentos.");
+                    setItemToDelete({id: null, type: null, data: null});
+                    return;
+                }
+            }
+            
+            batch.delete(docRef);
+            await batch.commit();
+
+        } catch (e) {
+            console.error("Erro ao apagar item:", e);
+            setAlertMessage("Ocorreu um erro ao apagar.");
+        } finally {
+            setItemToDelete({id: null, type: null, data: null});
+        }
+    };
+    
+    const handleMakePayment = async (paymentAmount) => {
+        if (!debtToPay || !paymentAmount || paymentAmount <= 0) return;
+        const batch = writeBatch(db);
+        const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
+        batch.set(newTransRef, { 
+            description: `Pagamento: ${debtToPay.description}`, 
+            amount: paymentAmount, type: TRANSACTION_TYPES.EXPENSE, category: 'Pagamento de Dívida', 
+            timestamp: Timestamp.now(), linkedDebtId: debtToPay.id 
+        });
+        const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id);
+        const newPaidAmount = debtToPay.paidAmount + paymentAmount;
+        const newStatus = newPaidAmount >= debtToPay.totalAmount ? DEBT_STATUS.PAID : DEBT_STATUS.ACTIVE;
+        batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
+        try {
+            await batch.commit();
+            setDebtToPay(null);
+        } catch (e) {
+            console.error("Erro ao processar pagamento:", e);
+            setAlertMessage("Ocorreu um erro ao processar o pagamento.");
+        }
+    };
+
+    const filteredTransactions = useMemo(() => {
+        if (filterPeriod === 'month') {
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth);
+        }
+        return transactions;
+    }, [transactions, filterPeriod]);
+
+    const { totalIncome, totalExpenses, balance } = useMemo(() => {
+        const income = filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.INCOME).reduce((acc, t) => acc + t.amount, 0);
+        const expenses = filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((acc, t) => acc + t.amount, 0);
+        return { totalIncome: income, totalExpenses: expenses, balance: income - expenses };
+    }, [filteredTransactions]);
+
+    const activeDebts = useMemo(() => debts.filter(d => d.status === DEBT_STATUS.ACTIVE), [debts]);
+    const totalActiveDebt = useMemo(() => activeDebts.reduce((acc, d) => acc + (d.totalAmount - d.paidAmount), 0), [activeDebts]);
 
     return (
-        <div>
-            {/* O JSX do FinancialManager vem aqui */}
+        <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
+            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({id: null, type: null, data: null})} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
+            <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
+            <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                    <div className="flex items-center space-x-3">
+                        <Icon name="wallet" className="text-indigo-600" size={32} />
+                        <h1 className="text-xl md:text-2xl font-bold text-gray-800">O Meu Gestor</h1>
+                    </div>
+                    <div className="flex items-center space-x-2 md:space-x-4">
+                        <button onClick={() => setView(view === 'dashboard' ? 'reports' : 'dashboard')} className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                            <Icon name={view === 'dashboard' ? 'barChart' : 'wallet'} size={18} />
+                            <span>{view === 'dashboard' ? 'Relatórios' : 'Dashboard'}</span>
+                        </button>
+                       <div className="text-right">
+                         <p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p>
+                       </div>
+                       <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors">
+                         <Icon name="logOut" size={20} />
+                       </button>
+                    </div>
+                </div>
+            </header>
+            {view === 'dashboard' ? (
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="flex justify-end mb-4"><div className="flex bg-white rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Desde o Início</button></div></div>
+                    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <SummaryCard title="Receitas" value={totalIncome} iconName="arrowUpCircle" colorClass="bg-green-100 text-green-800"/>
+                        <SummaryCard title="Despesas" value={totalExpenses} iconName="arrowDownCircle" colorClass="bg-red-100 text-red-800"/>
+                        <SummaryCard title="Saldo" value={balance} iconName="dollarSign" colorClass="bg-indigo-100 text-indigo-800"/>
+                        <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800"/>
+                    </section>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+                        <div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} /></div>
+                        <div className="lg:col-span-3">
+                            <div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-xl font-bold text-gray-800 mb-4">Distribuição de Despesas</h2><ExpensePieChart data={filteredTransactions} /></div>
+                            <div className="bg-white p-6 rounded-2xl shadow-md"><h2 className="text-xl font-bold text-gray-800 mb-4">Histórico de Transações</h2>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg"><Icon name="receiptText" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação neste período.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div>
+                        </div>
+                    </div>
+                    <hr className="my-8" />
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                            <div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div>
+                            <div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div>
+                        </div>
+                    </div>
+                </main>
+            ) : (
+                <Reports transactions={transactions} />
+            )}
         </div>
     );
-}
+};
