@@ -5,7 +5,7 @@ import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, a
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE V3
+//  CONFIGURAÇÃO DO FIREBASE v4
 // =============================================================================
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
