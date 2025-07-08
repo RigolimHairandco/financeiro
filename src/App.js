@@ -11,9 +11,7 @@ import { useExpenseCategories, useIncomeCategories } from './hooks/useCategories
 // =============================================================================
 const TRANSACTION_TYPES = { INCOME: 'income', EXPENSE: 'expense' };
 const DEBT_STATUS = { ACTIVE: 'active', PAID: 'paid' };
-// As listas fixas abaixo serão substituídas em breve
-const EXPENSE_CATEGORIES = ['Moradia', 'Alimentação', 'Transporte Combustível', 'Transporte Manutenção', 'Lazer', 'Educação', 'Vestuário', 'Saúde', 'Contas', 'Pagamento de Dívida', 'Outros'];
-const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 'Outros'];
+// AS LISTAS FIXAS DE CATEGORIAS FORAM REMOVIDAS DAQUI
 
 // =============================================================================
 //  HOOKS PERSONALIZADOS
@@ -83,14 +81,105 @@ const LoginScreen = ({ onLogin }) => { /* ...código inalterado... */ };
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => { /* ...código inalterado... */ };
 const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => { /* ...código inalterado... */ };
 const SummaryCard = ({ title, value, iconName, colorClass }) => { /* ...código inalterado... */ };
-const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, activeDebts, userId }) => { /* ...código inalterado... */ };
+
+// ATUALIZADO: TransactionForm agora usa categorias dinâmicas
+const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, activeDebts, userId, expenseCategories, incomeCategories }) => {
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [type, setType] = useState(TRANSACTION_TYPES.EXPENSE);
+    // Define o estado inicial da categoria para a primeira da lista, se a lista existir
+    const [category, setCategory] = useState(expenseCategories?.[0]?.name || '');
+    const [incomeSource, setIncomeSource] = useState(incomeCategories?.[0]?.name || '');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [linkedDebtId, setLinkedDebtId] = useState('');
+    const isEditing = !!transactionToEdit;
+
+    useEffect(() => {
+        if (isEditing) {
+            setDescription(transactionToEdit.description); setAmount(transactionToEdit.amount);
+            setType(transactionToEdit.type); setDate(transactionToEdit.timestamp.toDate().toISOString().split('T')[0]);
+            if (transactionToEdit.type === TRANSACTION_TYPES.EXPENSE) setCategory(transactionToEdit.category);
+            else setIncomeSource(transactionToEdit.incomeSource);
+            setLinkedDebtId(transactionToEdit.linkedDebtId || '');
+        }
+    }, [transactionToEdit, isEditing]);
+    
+    // Atualiza a categoria selecionada se a lista mudar (ex: ao adicionar uma nova)
+    useEffect(() => {
+        if (!isEditing) {
+            setCategory(expenseCategories?.[0]?.name || '');
+        }
+    }, [expenseCategories, isEditing]);
+
+    useEffect(() => {
+        if (!isEditing) {
+            setIncomeSource(incomeCategories?.[0]?.name || '');
+        }
+    }, [incomeCategories, isEditing]);
+
+    const resetForm = () => {
+        setDescription(''); setAmount(''); setDate(new Date().toISOString().split('T')[0]); setTransactionToEdit(null); setLinkedDebtId('');
+        setCategory(expenseCategories?.[0]?.name || ''); setIncomeSource(incomeCategories?.[0]?.name || '');
+        setType(TRANSACTION_TYPES.EXPENSE);
+    }
+    const handleSubmit = async (e) => {
+        e.preventDefault(); if (!description || !amount || parseFloat(amount) <= 0) return;
+        const transactionData = {
+            description, amount: parseFloat(amount), type, timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')),
+            ...(type === TRANSACTION_TYPES.EXPENSE && { category }), ...(type === TRANSACTION_TYPES.INCOME && { incomeSource }),
+            ...(category === 'Pagamento de Dívida' && linkedDebtId && { linkedDebtId })
+        };
+        await onSave(transactionData, transactionToEdit?.id); resetForm();
+    };
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">{isEditing ? 'Editar Transação' : 'Adicionar Transação'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {!isEditing && (
+                    <div><div className="flex bg-gray-100 rounded-full p-1"><button type="button" onClick={() => setType(TRANSACTION_TYPES.EXPENSE)} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === TRANSACTION_TYPES.EXPENSE ? 'bg-red-500 text-white shadow' : 'text-gray-600'}`}>Despesa</button><button type="button" onClick={() => setType(TRANSACTION_TYPES.INCOME)} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === TRANSACTION_TYPES.INCOME ? 'bg-green-500 text-white shadow' : 'text-gray-600'}`}>Receita</button></div></div>
+                )}
+                <div><label htmlFor="description" className="block text-sm font-medium text-gray-600 mb-1">Descrição</label><input id="description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={type === TRANSACTION_TYPES.EXPENSE ? 'Ex: Supermercado' : 'Ex: Job de fotografia'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><label htmlFor="amount" className="block text-sm font-medium text-gray-600 mb-1">Valor (R$)</label><input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                    <div><label htmlFor="date" className="block text-sm font-medium text-gray-600 mb-1">Data</label><input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                </div>
+                <div>
+                    {type === TRANSACTION_TYPES.EXPENSE ? (
+                        <>
+                            <label htmlFor="category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
+                            <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                {expenseCategories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                                <option value="Pagamento de Dívida">Pagamento de Dívida</option>
+                            </select>
+                            {category === 'Pagamento de Dívida' && !isEditing && (
+                                <div className="mt-4">
+                                    <label htmlFor="linked-debt" className="block text-sm font-medium text-gray-600 mb-1">Associar Pagamento a Dívida (Opcional)</label>
+                                    <select id="linked-debt" value={linkedDebtId} onChange={(e) => setLinkedDebtId(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg"><option value="">Pagamento Avulso</option>{activeDebts.map(debt => <option key={debt.id} value={debt.id}>{debt.description}</option>)}</select>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <><label htmlFor="incomeSource" className="block text-sm font-medium text-gray-600 mb-1">Fonte da Receita</label>
+                        <select id="incomeSource" value={incomeSource} onChange={(e) => setIncomeSource(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            {incomeCategories.map(src => <option key={src.id} value={src.name}>{src.name}</option>)}
+                        </select></>
+                    )}
+                </div>
+                <div className="flex items-center gap-4 pt-2">
+                    <button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">{isEditing ? 'Guardar Alterações' : 'Adicionar'}</button>
+                    {isEditing && (<button type="button" onClick={resetForm} className="w-full py-3 px-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300">Cancelar</button>)}
+                </div>
+            </form>
+        </div>
+    );
+};
+
 const TransactionItem = ({ transaction, onEdit, onDelete }) => { /* ...código inalterado... */ };
 const ExpensePieChart = ({ data }) => { /* ...código inalterado... */ };
 const DebtForm = ({ onSave }) => { /* ...código inalterado... */ };
 const DebtItem = ({ debt, onPay, onDelete }) => { /* ...código inalterado... */ };
 const Reports = ({ transactions }) => { /* ...código inalterado... */ };
 
-// ATUALIZADO: SettingsPage agora tem formulários
 const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddExpenseCategory, onAddIncomeCategory, onDeleteCategory }) => {
     const [newExpenseCat, setNewExpenseCat] = useState('');
     const [newIncomeCat, setNewIncomeCat] = useState('');
@@ -120,9 +209,7 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddExpen
             <h1 className="text-3xl font-bold text-gray-800 mb-8">
                 Gerir Categorias
             </h1>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                {/* Coluna de Despesas */}
                 <div>
                     <h2 className="text-2xl font-semibold text-gray-700 mb-4">Categorias de Despesa</h2>
                     <div className="bg-white p-6 rounded-2xl shadow-md">
@@ -146,8 +233,6 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddExpen
                         </ul>
                     </div>
                 </div>
-
-                {/* Coluna de Receitas */}
                 <div>
                     <h2 className="text-2xl font-semibold text-gray-700 mb-4">Fontes de Receita</h2>
                     <div className="bg-white p-6 rounded-2xl shadow-md">
@@ -176,7 +261,7 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddExpen
     );
 };
 
-// ATUALIZADO: FinancialManager agora tem as funções para salvar e deletar categorias
+// ATUALIZADO: FinancialManager agora passa as categorias dinâmicas para o TransactionForm
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const debts = useDebts(user.uid);
@@ -189,29 +274,8 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const [debtToPay, setDebtToPay] = useState(null);
     const [view, setView] = useState('dashboard');
 
-    // FUNÇÕES DE SALVAR E DELETAR CATEGORIAS
-    const handleAddCategory = async (collectionName, categoryName) => {
-        if (!categoryName) return;
-        try {
-            await addDoc(collection(db, `users/${user.uid}/${collectionName}`), {
-                name: categoryName
-            });
-        } catch (e) {
-            console.error("Erro ao adicionar categoria:", e);
-            setAlertMessage("Ocorreu um erro ao adicionar a categoria.");
-        }
-    };
-
-    const handleDeleteCategory = async (collectionName, categoryId) => {
-        if (!categoryId) return;
-        try {
-            await deleteDoc(doc(db, `users/${user.uid}/${collectionName}`, categoryId));
-        } catch (e) {
-            console.error("Erro ao apagar categoria:", e);
-            setAlertMessage("Ocorreu um erro ao apagar a categoria.");
-        }
-    };
-
+    const handleAddCategory = async (collectionName, categoryName) => { /* ...código inalterado... */ };
+    const handleDeleteCategory = async (collectionName, categoryId) => { /* ...código inalterado... */ };
     const handleSaveTransaction = async (data, id) => { /* ...código inalterado... */ };
     const handleSaveDebt = async (data) => { /* ...código inalterado... */ };
     const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
@@ -227,9 +291,8 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
         <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
             <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({id: null, type: null, data: null})} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
             <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
-            
             <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
-                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-3">
                         <button onClick={() => setView('dashboard')} className="flex items-center gap-3">
                             <Icon name="wallet" className="text-indigo-600" size={32} />
@@ -237,38 +300,53 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                         </button>
                     </div>
                     <div className="flex items-center space-x-2 md:space-x-4">
-                        <button onClick={() => setView('reports')} title="Relatórios" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors">
-                            <Icon name="barChart" size={20} />
-                        </button>
-                        <button onClick={() => setView('settings')} title="Configurações" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors">
-                            <Icon name="settings" size={20} />
-                        </button>
+                        <button onClick={() => setView('reports')} title="Relatórios" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"><Icon name="barChart" size={20} /></button>
+                        <button onClick={() => setView('settings')} title="Configurações" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"><Icon name="settings" size={20} /></button>
                         <div className="text-right"><p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p></div>
-                        <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors">
-                            <Icon name="logOut" size={20} />
-                        </button>
+                        <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"><Icon name="logOut" size={20} /></button>
                     </div>
                 </div>
             </header>
             
             {view === 'dashboard' && (
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {/* ...dashboard inalterado... */}
+                    <div className="flex justify-end mb-4"><div className="flex bg-white rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Desde o Início</button></div></div>
+                    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <SummaryCard title="Receitas" value={totalIncome} iconName="arrowUpCircle" colorClass="bg-green-100 text-green-800" />
+                        <SummaryCard title="Despesas" value={totalExpenses} iconName="arrowDownCircle" colorClass="bg-red-100 text-red-800" />
+                        <SummaryCard title="Saldo" value={balance} iconName="dollarSign" colorClass="bg-indigo-100 text-indigo-800" />
+                        <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" />
+                    </section>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+                        <div className="lg:col-span-2">
+                            <TransactionForm 
+                                onSave={handleSaveTransaction} 
+                                transactionToEdit={transactionToEdit} 
+                                setTransactionToEdit={setTransactionToEdit} 
+                                activeDebts={activeDebts} 
+                                userId={user.uid}
+                                // Passando as listas dinâmicas para o formulário
+                                expenseCategories={expenseCategories}
+                                incomeCategories={incomeCategories}
+                            />
+                        </div>
+                        <div className="lg:col-span-3">
+                            <div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-xl font-bold text-gray-800 mb-4">Distribuição de Despesas</h2><ExpensePieChart data={filteredTransactions} /></div>
+                            <div className="bg-white p-6 rounded-2xl shadow-md"><h2 className="text-xl font-bold text-gray-800 mb-4">Histórico de Transações</h2>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg"><Icon name="receiptText" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação neste período.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div>
+                        </div>
+                    </div>
+                    <hr className="my-8" />
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                            <div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div>
+                            <div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div>
+                        </div>
+                    </div>
                 </main>
             )}
-
             {view === 'reports' && <Reports transactions={transactions} />}
-            
-            {view === 'settings' && 
-                <SettingsPage 
-                    setView={setView} 
-                    expenseCategories={expenseCategories} 
-                    incomeCategories={incomeCategories}
-                    onAddExpenseCategory={(name) => handleAddCategory('expenseCategories', name)}
-                    onAddIncomeCategory={(name) => handleAddCategory('incomeCategories', name)}
-                    onDeleteCategory={handleDeleteCategory}
-                />
-            }
+            {view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} onAddExpenseCategory={(name) => handleAddCategory('expenseCategories', name)} onAddIncomeCategory={(name) => handleAddCategory('incomeCategories', name)} onDeleteCategory={handleDeleteCategory} />}
         </div>
     );
 };
