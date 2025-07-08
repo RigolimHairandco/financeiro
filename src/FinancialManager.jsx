@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-// Nota: O 'db' e 'Timestamp' são importados do seu ficheiro de configuração do Firebase
-// Para este exemplo, vamos assumir que são passados como props ou importados de um ficheiro central.
-// Neste caso, para manter a simplicidade, vamos re-inicializar o necessário aqui.
 import { initializeApp } from 'firebase/app';
 
+// =============================================================================
+//  CONFIGURAÇÃO DO FIREBASE
+// =============================================================================
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
     authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -26,6 +25,35 @@ const TRANSACTION_TYPES = { INCOME: 'income', EXPENSE: 'expense' };
 const DEBT_STATUS = { ACTIVE: 'active', PAID: 'paid' };
 const EXPENSE_CATEGORIES = ['Moradia', 'Alimentação', 'Transporte Combustível', 'Transporte Manutenção', 'Lazer', 'Educação', 'Vestuário', 'Saúde', 'Contas', 'Pagamento de Dívida', 'Outros'];
 const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 'Outros'];
+
+// =============================================================================
+//  HOOKS PERSONALIZADOS
+// =============================================================================
+function useTransactions(userId) {
+    const [transactions, setTransactions] = useState([]);
+    useEffect(() => {
+        if (!userId) return;
+        const q = query(collection(db, `users/${userId}/transactions`), orderBy("timestamp", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsubscribe();
+    }, [userId]);
+    return transactions;
+}
+
+function useDebts(userId) {
+    const [debts, setDebts] = useState([]);
+    useEffect(() => {
+        if (!userId) return;
+        const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsubscribe();
+    }, [userId]);
+    return debts;
+}
 
 // =============================================================================
 //  COMPONENTES DE UI
