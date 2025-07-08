@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 import { initializeApp } from 'firebase/app';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE
+//  CONFIGURAÇÃO DO FIREBASE (Re-inicialização para este componente)
 // =============================================================================
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
@@ -15,8 +15,16 @@ const firebaseConfig = {
     appId: process.env.REACT_APP_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Inicializa uma instância secundária do Firebase para evitar conflitos
+// se o App.js também inicializar.
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  app = initializeApp(firebaseConfig, "secondary");
+}
 const db = getFirestore(app);
+
 
 // =============================================================================
 //  CONSTANTES
@@ -85,7 +93,7 @@ const Icon = ({ name, size = 24, className = '' }) => {
     return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name.toLowerCase()] || <circle cx="12" cy="12" r="10" />}</svg>;
 };
 
-// ... (Todos os outros componentes auxiliares como AlertModal, ConfirmationModal, etc. vêm aqui)
+// ... (Todos os outros componentes auxiliares como ConfirmationModal, PaymentModal, etc. vêm aqui)
 
 // =============================================================================
 //  COMPONENTE PRINCIPAL DO PAINEL
