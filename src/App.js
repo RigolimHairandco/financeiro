@@ -1,28 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
+// REMOVIDO: imports de inicialização do Firebase
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, query, where, getDocs, orderBy, onSnapshot, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useAuth } from './hooks/useAuth'; // <-- 1. IMPORTAÇÃO ADICIONADA
+
+// ADICIONADO: Importa a conexão centralizada e o hook de autenticação
+import { auth, db } from './firebase';
+import { useAuth } from './hooks/useAuth';
 
 // =============================================================================
-//  CONFIGURAÇÃO DO FIREBASE
+//  A CONFIGURAÇÃO DO FIREBASE FOI MOVIDA PARA O ARQUIVO `firebase.js`
 // =============================================================================
-const firebaseConfig = {
-    apiKey: process.env.REACT_APP_API_KEY,
-    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
-    projectId: process.env.REACT_APP_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_APP_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 // =============================================================================
-//  CONSTANTES
+//  CONSTANTES (permanecem iguais)
 // =============================================================================
 const TRANSACTION_TYPES = { INCOME: 'income', EXPENSE: 'expense' };
 const DEBT_STATUS = { ACTIVE: 'active', PAID: 'paid' };
@@ -30,7 +21,7 @@ const EXPENSE_CATEGORIES = ['Moradia', 'Alimentação', 'Transporte Combustível
 const INCOME_SOURCES = ['Salário', 'Fotografia', 'Freelance', 'Investimentos', 'Outros'];
 
 // =============================================================================
-//  HOOKS PERSONALIZADOS
+//  HOOKS PERSONALIZADOS (permanecem iguais)
 // =============================================================================
 function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
@@ -65,7 +56,7 @@ function useDebts(userId) {
 }
 
 // =============================================================================
-//  COMPONENTES DE UI (Definidos antes de serem usados)
+//  COMPONENTES DE UI (Todos os componentes internos permanecem iguais)
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
@@ -96,21 +87,13 @@ const Icon = ({ name, size = 24, className = '' }) => {
 
 const CategoryIcon = ({ category }) => {
     const categoryIcons = {
-        'Moradia': 'home',
-        'Alimentação': 'utensils',
-        'Transporte Combustível': 'car',
-        'Transporte Manutenção': 'car',
-        'Lazer': 'popcorn',
-        'Educação': 'graduationCap',
-        'Vestuário': 'shirt',
-        'Saúde': 'heartPulse',
-        'Contas': 'receiptText',
-        'Pagamento de Dívida': 'landmark',
-        'Outros': 'dollarSign',
+        'Moradia': 'home', 'Alimentação': 'utensils', 'Transporte Combustível': 'car',
+        'Transporte Manutenção': 'car', 'Lazer': 'popcorn', 'Educação': 'graduationCap',
+        'Vestuário': 'shirt', 'Saúde': 'heartPulse', 'Contas': 'receiptText',
+        'Pagamento de Dívida': 'landmark', 'Outros': 'dollarSign',
     };
     return <Icon name={categoryIcons[category] || 'dollarSign'} size={20} className="text-gray-500" />;
 };
-
 
 const AlertModal = ({ message, onClose }) => {
     if (!message) return null;
@@ -132,7 +115,6 @@ const LoginScreen = ({ onLogin }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-
     const handleLoginSubmit = (e) => {
         e.preventDefault();
         if (!email || !password) {
@@ -141,14 +123,13 @@ const LoginScreen = ({ onLogin }) => {
         }
         onLogin(email, password);
     };
-
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
             <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
                 <div className="text-center">
                     <Icon name="wallet" className="mx-auto text-indigo-600" size={48} />
                     <h2 className="mt-6 text-3xl font-bold text-gray-900">Aceder ao Gestor Financeiro</h2>
-                    <p className="mt-2 text-sm text-gray-600">Use as suas credenciais do Firebase para entrar.<br /><strong className="text-indigo-600">Importante:</strong> Precisa de ter criado um utilizador no painel do seu Firebase.</p>
+                    <p className="mt-2 text-sm text-gray-600">Use as suas credenciais para entrar.</p>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
                     <div className="rounded-md shadow-sm -space-y-px">
@@ -170,14 +151,14 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
 
 const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => {
     const [amount, setAmount] = useState('');
-    useEffect(() => { if(isOpen) { setAmount(''); } }, [isOpen]);
+    useEffect(() => { if (isOpen) { setAmount(''); } }, [isOpen]);
     if (!isOpen) return null;
     const remaining = debt.totalAmount - debt.paidAmount;
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
             <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
                 <h3 className="text-lg font-bold mb-2">Registar Pagamento</h3><p className="text-sm text-gray-600 mb-4">Dívida: <span className="font-semibold">{debt.description}</span></p>
-                <label htmlFor="payment-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Pagamento</label><input id="payment-amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Restante: ${remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
+                <label htmlFor="payment-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Pagamento</label><input id="payment-amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Restante: ${remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
                 <div className="flex justify-end gap-4 mt-6"><button onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button><button onClick={() => onConfirm(parseFloat(amount))} disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > remaining} className="py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400">Confirmar</button></div>
             </div>
         </div>
@@ -186,9 +167,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => {
 
 const SummaryCard = ({ title, value, iconName, colorClass }) => (
     <div className="bg-white p-6 rounded-2xl shadow-md flex items-center space-x-4 transition-transform hover:scale-105">
-        <div className={`p-3 rounded-full ${colorClass}`}>
-            <Icon name={iconName} size={24} className="currentColor" />
-        </div>
+        <div className={`p-3 rounded-full ${colorClass}`}><Icon name={iconName} size={24} className="currentColor" /></div>
         <div>
             <p className="text-sm text-gray-500">{title}</p>
             <p className="text-2xl font-bold text-gray-800">{value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
@@ -200,42 +179,32 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [type, setType] = useState(TRANSACTION_TYPES.EXPENSE);
-    const [category, setCategory] = useState(EXPENSE_CATEGORIES[1]); // Alimentação
-    const [incomeSource, setIncomeSource] = useState(INCOME_SOURCES[0]); // Salário
+    const [category, setCategory] = useState(EXPENSE_CATEGORIES[1]);
+    const [incomeSource, setIncomeSource] = useState(INCOME_SOURCES[0]);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [linkedDebtId, setLinkedDebtId] = useState('');
     const isEditing = !!transactionToEdit;
-
     useEffect(() => {
         if (isEditing) {
-            setDescription(transactionToEdit.description);
-            setAmount(transactionToEdit.amount);
-            setType(transactionToEdit.type);
-            setDate(transactionToEdit.timestamp.toDate().toISOString().split('T')[0]);
-            if(transactionToEdit.type === TRANSACTION_TYPES.EXPENSE) setCategory(transactionToEdit.category);
+            setDescription(transactionToEdit.description); setAmount(transactionToEdit.amount);
+            setType(transactionToEdit.type); setDate(transactionToEdit.timestamp.toDate().toISOString().split('T')[0]);
+            if (transactionToEdit.type === TRANSACTION_TYPES.EXPENSE) setCategory(transactionToEdit.category);
             else setIncomeSource(transactionToEdit.incomeSource);
             setLinkedDebtId(transactionToEdit.linkedDebtId || '');
         }
     }, [transactionToEdit, isEditing]);
-
     const resetForm = () => {
         setDescription(''); setAmount(''); setDate(new Date().toISOString().split('T')[0]); setTransactionToEdit(null); setLinkedDebtId(''); setCategory(EXPENSE_CATEGORIES[1]); setType(TRANSACTION_TYPES.EXPENSE);
     }
-
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!description || !amount || parseFloat(amount) <= 0) return;
-        const transactionData = { 
-            description, amount: parseFloat(amount), type, 
-            timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')), 
-            ...(type === TRANSACTION_TYPES.EXPENSE && { category }), 
-            ...(type === TRANSACTION_TYPES.INCOME && { incomeSource }), 
+        e.preventDefault(); if (!description || !amount || parseFloat(amount) <= 0) return;
+        const transactionData = {
+            description, amount: parseFloat(amount), type, timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')),
+            ...(type === TRANSACTION_TYPES.EXPENSE && { category }), ...(type === TRANSACTION_TYPES.INCOME && { incomeSource }),
             ...(category === 'Pagamento de Dívida' && linkedDebtId && { linkedDebtId })
         };
-        await onSave(transactionData, transactionToEdit?.id);
-        resetForm();
+        await onSave(transactionData, transactionToEdit?.id); resetForm();
     };
-
     return (
         <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
             <h2 className="text-xl font-bold text-gray-800 mb-4">{isEditing ? 'Editar Transação' : 'Adicionar Transação'}</h2>
@@ -276,7 +245,6 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
 const TransactionItem = ({ transaction, onEdit, onDelete }) => {
     const isIncome = transaction.type === TRANSACTION_TYPES.INCOME;
     const date = transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleDateString('pt-BR') : 'Data inválida';
-
     return (
         <li className="flex items-center justify-between p-4 bg-slate-50 rounded-xl transition-shadow hover:shadow-md">
             <div className="flex items-center space-x-4">
@@ -314,7 +282,7 @@ const ExpensePieChart = ({ data }) => {
                 <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} labelLine={false} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
                     {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/>
+                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
                 <Legend />
             </PieChart>
         </ResponsiveContainer>
@@ -324,14 +292,10 @@ const ExpensePieChart = ({ data }) => {
 const DebtForm = ({ onSave }) => {
     const [description, setDescription] = useState('');
     const [totalAmount, setTotalAmount] = useState('');
-    
     const resetForm = () => { setDescription(''); setTotalAmount(''); };
-
-    const handleSubmit = async (e) => { 
-        e.preventDefault(); 
-        if (!description || !totalAmount || parseFloat(totalAmount) <= 0) return; 
-        await onSave({ description, totalAmount: parseFloat(totalAmount), paidAmount: 0, status: DEBT_STATUS.ACTIVE, createdAt: Timestamp.now() }); 
-        resetForm();
+    const handleSubmit = async (e) => {
+        e.preventDefault(); if (!description || !totalAmount || parseFloat(totalAmount) <= 0) return;
+        await onSave({ description, totalAmount: parseFloat(totalAmount), paidAmount: 0, status: DEBT_STATUS.ACTIVE, createdAt: Timestamp.now() }); resetForm();
     };
     return (
         <div className="bg-white p-6 rounded-2xl shadow-md">
@@ -351,47 +315,30 @@ const DebtItem = ({ debt, onPay, onDelete }) => {
     const remaining = totalAmount - paidAmount;
     return (
         <li className="bg-slate-50 p-4 rounded-xl mb-3">
-            <div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} / {totalAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span></div>
+            <div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / {totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
             <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div className="bg-teal-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div></div>
-            <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div>
+            <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div>
         </li>
     );
 };
 
-// <-- 2. O BLOCO DUPLICADO DO PAYMENTMODAL QUE ESTAVA AQUI FOI REMOVIDO.
-
 const Reports = ({ transactions }) => {
     const getMonthStartEnd = () => {
-        const now = new Date();
-        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const now = new Date(); const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        return {
-            start: startDate.toISOString().split('T')[0],
-            end: endDate.toISOString().split('T')[0]
-        };
+        return { start: startDate.toISOString().split('T')[0], end: endDate.toISOString().split('T')[0] };
     };
-
     const [startDate, setStartDate] = useState(getMonthStartEnd().start);
     const [endDate, setEndDate] = useState(getMonthStartEnd().end);
-
     const filteredTransactions = useMemo(() => {
-        const start = new Date(startDate + 'T00:00:00');
-        const end = new Date(endDate + 'T23:59:59');
-        return transactions.filter(t => {
-            const transDate = t.timestamp.toDate();
-            return transDate >= start && transDate <= end;
-        });
+        const start = new Date(startDate + 'T00:00:00'); const end = new Date(endDate + 'T23:59:59');
+        return transactions.filter(t => { const transDate = t.timestamp.toDate(); return transDate >= start && transDate <= end; });
     }, [transactions, startDate, endDate]);
-
     const incomes = useMemo(() => filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.INCOME), [filteredTransactions]);
     const expenses = useMemo(() => filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.EXPENSE), [filteredTransactions]);
     const totalIncome = useMemo(() => incomes.reduce((acc, t) => acc + t.amount, 0), [incomes]);
     const totalExpenses = useMemo(() => expenses.reduce((acc, t) => acc + t.amount, 0), [expenses]);
-
-    const handlePrint = () => {
-        window.print();
-    };
-
+    const handlePrint = () => { window.print(); };
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="bg-white p-6 rounded-2xl shadow-md no-print">
@@ -399,52 +346,34 @@ const Reports = ({ transactions }) => {
                 <div className="flex flex-wrap items-center gap-4 mb-6">
                     <div>
                         <label htmlFor="start-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Início</label>
-                        <input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg"/>
+                        <input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" />
                     </div>
                     <div>
                         <label htmlFor="end-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Fim</label>
-                        <input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg"/>
+                        <input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" />
                     </div>
                     <div className="self-end">
                         <button onClick={handlePrint} className="flex items-center space-x-2 py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
-                            <Icon name="printer" size={18} />
-                            <span>Imprimir</span>
+                            <Icon name="printer" size={18} /><span>Imprimir</span>
                         </button>
                     </div>
                 </div>
             </div>
-
             <div className="mt-8 printable">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-white p-6 rounded-2xl shadow-md">
                         <h3 className="text-xl font-bold text-green-600 mb-4">Entradas</h3>
                         <ul className="space-y-2">
-                            {incomes.map(t => (
-                                <li key={t.id} className="flex justify-between items-center border-b pb-2">
-                                    <span>{t.description}</span>
-                                    <span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </li>
-                            ))}
+                            {incomes.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
                         </ul>
-                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold">
-                            <span>Total de Entradas:</span>
-                            <span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </div>
+                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Entradas:</span><span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
                     </div>
                     <div className="bg-white p-6 rounded-2xl shadow-md">
                         <h3 className="text-xl font-bold text-red-600 mb-4">Saídas</h3>
                         <ul className="space-y-2">
-                            {expenses.map(t => (
-                                <li key={t.id} className="flex justify-between items-center border-b pb-2">
-                                    <span>{t.description}</span>
-                                    <span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </li>
-                            ))}
+                            {expenses.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
                         </ul>
-                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold">
-                            <span>Total de Saídas:</span>
-                            <span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </div>
+                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Saídas:</span><span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
                     </div>
                 </div>
             </div>
@@ -455,117 +384,78 @@ const Reports = ({ transactions }) => {
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const debts = useDebts(user.uid);
-    
     const [transactionToEdit, setTransactionToEdit] = useState(null);
-    const [itemToDelete, setItemToDelete] = useState({id: null, type: null, data: null});
+    const [itemToDelete, setItemToDelete] = useState({ id: null, type: null, data: null });
     const [filterPeriod, setFilterPeriod] = useState('month');
     const [debtToPay, setDebtToPay] = useState(null);
     const [view, setView] = useState('dashboard');
-
     const handleSaveTransaction = async (data, id) => {
         const batch = writeBatch(db);
         try {
             if (id) {
-                if(data.linkedDebtId) {
-                    setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova.");
-                    return;
-                }
-                const transRef = doc(db, `users/${user.uid}/transactions`, id);
-                batch.update(transRef, data);
+                if (data.linkedDebtId) { setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova."); return; }
+                const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data);
             } else {
-                const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
-                batch.set(newTransRef, data);
+                const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data);
                 if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) {
                     const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
                     const debtDoc = await getDoc(debtRef);
-                    if(debtDoc.exists()){
-                        const debtData = debtDoc.data();
-                        const newPaidAmount = debtData.paidAmount + data.amount;
+                    if (debtDoc.exists()) {
+                        const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount;
                         const newStatus = newPaidAmount >= debtData.totalAmount ? DEBT_STATUS.PAID : DEBT_STATUS.ACTIVE;
                         batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
                     }
                 }
             }
             await batch.commit();
-        } catch (e) {
-            console.error("Erro ao guardar transação:", e);
-            setAlertMessage("Ocorreu um erro ao guardar a transação.");
-        }
+        } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage("Ocorreu um erro ao guardar a transação."); }
     };
-
     const handleSaveDebt = async (data) => {
-        try {
-            await addDoc(collection(db, `users/${user.uid}/debts`), data);
-        } catch (e) {
-            console.error("Erro ao guardar dívida:", e);
-            setAlertMessage("Ocorreu um erro ao guardar a dívida.");
-        }
+        try { await addDoc(collection(db, `users/${user.uid}/debts`), data); }
+        catch (e) { console.error("Erro ao guardar dívida:", e); setAlertMessage("Ocorreu um erro ao guardar a dívida."); }
     };
-
-    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
-
+    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({ id, type, data });
     const handleDelete = async () => {
         if (!itemToDelete.id) return;
         const { id, type, data } = itemToDelete;
         const batch = writeBatch(db);
         const path = `users/${user.uid}/${type}s`;
         const docRef = doc(db, path, id);
-
         try {
             if (type === 'transaction' && data?.linkedDebtId) {
                 const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId);
                 const debtDoc = await getDoc(debtRef);
                 if (debtDoc.exists()) {
-                    const debtData = debtDoc.data();
-                    const newPaidAmount = debtData.paidAmount - data.amount;
-                    batch.update(debtRef, { 
-                        paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, 
-                        status: DEBT_STATUS.ACTIVE 
-                    });
+                    const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - data.amount;
+                    batch.update(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: DEBT_STATUS.ACTIVE });
                 }
             } else if (type === 'debt') {
                 const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id));
                 const transSnapshot = await getDocs(transQuery);
                 if (!transSnapshot.empty) {
-                    setAlertMessage("Não é possível apagar uma dívida que já possui pagamentos registados. Apague primeiro os pagamentos.");
-                    setItemToDelete({id: null, type: null, data: null});
-                    return;
+                    setAlertMessage("Não é possível apagar uma dívida com pagamentos registados. Apague primeiro os pagamentos.");
+                    setItemToDelete({ id: null, type: null, data: null }); return;
                 }
             }
-            
-            batch.delete(docRef);
-            await batch.commit();
-
-        } catch (e) {
-            console.error("Erro ao apagar item:", e);
-            setAlertMessage("Ocorreu um erro ao apagar.");
-        } finally {
-            setItemToDelete({id: null, type: null, data: null});
-        }
+            batch.delete(docRef); await batch.commit();
+        } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage("Ocorreu um erro ao apagar."); }
+        finally { setItemToDelete({ id: null, type: null, data: null }); }
     };
-    
     const handleMakePayment = async (paymentAmount) => {
         if (!debtToPay || !paymentAmount || paymentAmount <= 0) return;
         const batch = writeBatch(db);
         const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
-        batch.set(newTransRef, { 
-            description: `Pagamento: ${debtToPay.description}`, 
-            amount: paymentAmount, type: TRANSACTION_TYPES.EXPENSE, category: 'Pagamento de Dívida', 
-            timestamp: Timestamp.now(), linkedDebtId: debtToPay.id 
+        batch.set(newTransRef, {
+            description: `Pagamento: ${debtToPay.description}`, amount: paymentAmount, type: TRANSACTION_TYPES.EXPENSE, category: 'Pagamento de Dívida',
+            timestamp: Timestamp.now(), linkedDebtId: debtToPay.id
         });
         const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id);
         const newPaidAmount = debtToPay.paidAmount + paymentAmount;
         const newStatus = newPaidAmount >= debtToPay.totalAmount ? DEBT_STATUS.PAID : DEBT_STATUS.ACTIVE;
         batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
-        try {
-            await batch.commit();
-            setDebtToPay(null);
-        } catch (e) {
-            console.error("Erro ao processar pagamento:", e);
-            setAlertMessage("Ocorreu um erro ao processar o pagamento.");
-        }
+        try { await batch.commit(); setDebtToPay(null); }
+        catch (e) { console.error("Erro ao processar pagamento:", e); setAlertMessage("Ocorreu um erro ao processar o pagamento."); }
     };
-
     const filteredTransactions = useMemo(() => {
         if (filterPeriod === 'month') {
             const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -573,19 +463,16 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
         }
         return transactions;
     }, [transactions, filterPeriod]);
-
     const { totalIncome, totalExpenses, balance } = useMemo(() => {
         const income = filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.INCOME).reduce((acc, t) => acc + t.amount, 0);
         const expenses = filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((acc, t) => acc + t.amount, 0);
         return { totalIncome: income, totalExpenses: expenses, balance: income - expenses };
     }, [filteredTransactions]);
-
     const activeDebts = useMemo(() => debts.filter(d => d.status === DEBT_STATUS.ACTIVE), [debts]);
     const totalActiveDebt = useMemo(() => activeDebts.reduce((acc, d) => acc + (d.totalAmount - d.paidAmount), 0), [activeDebts]);
-
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
-            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({id: null, type: null, data: null})} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
+            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({ id: null, type: null, data: null })} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
             <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
             <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -598,12 +485,8 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                             <Icon name={view === 'dashboard' ? 'barChart' : 'wallet'} size={18} />
                             <span>{view === 'dashboard' ? 'Relatórios' : 'Dashboard'}</span>
                         </button>
-                       <div className="text-right">
-                         <p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p>
-                       </div>
-                       <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors">
-                         <Icon name="logOut" size={20} />
-                       </button>
+                        <div className="text-right"><p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p></div>
+                        <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"><Icon name="logOut" size={20} /></button>
                     </div>
                 </div>
             </header>
@@ -611,10 +494,10 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="flex justify-end mb-4"><div className="flex bg-white rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Desde o Início</button></div></div>
                     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <SummaryCard title="Receitas" value={totalIncome} iconName="arrowUpCircle" colorClass="bg-green-100 text-green-800"/>
-                        <SummaryCard title="Despesas" value={totalExpenses} iconName="arrowDownCircle" colorClass="bg-red-100 text-red-800"/>
-                        <SummaryCard title="Saldo" value={balance} iconName="dollarSign" colorClass="bg-indigo-100 text-indigo-800"/>
-                        <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800"/>
+                        <SummaryCard title="Receitas" value={totalIncome} iconName="arrowUpCircle" colorClass="bg-green-100 text-green-800" />
+                        <SummaryCard title="Despesas" value={totalExpenses} iconName="arrowDownCircle" colorClass="bg-red-100 text-red-800" />
+                        <SummaryCard title="Saldo" value={balance} iconName="dollarSign" colorClass="bg-indigo-100 text-indigo-800" />
+                        <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" />
                     </section>
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
                         <div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} /></div>
@@ -632,9 +515,7 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                         </div>
                     </div>
                 </main>
-            ) : (
-                <Reports transactions={transactions} />
-            )}
+            ) : (<Reports transactions={transactions} />)}
         </div>
     );
 };
@@ -645,24 +526,14 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
 export default function App() {
     const { user, loading } = useAuth();
     const [alertMessage, setAlertMessage] = useState('');
-    
     const handleLogin = async (email, password) => {
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (error) {
-            setAlertMessage("Falha no login: Verifique as suas credenciais.");
-            console.error("Login error:", error.message);
-        }
+        try { await signInWithEmailAndPassword(auth, email, password); }
+        catch (error) { setAlertMessage("Falha no login: Verifique as suas credenciais."); console.error("Login error:", error.message); }
     };
-
     const handleLogout = async () => {
-        try {
-            await signOut(auth);
-        } catch (error) {
-            setAlertMessage("Erro ao fazer logout: " + error.message);
-        }
+        try { await signOut(auth); }
+        catch (error) { setAlertMessage("Erro ao fazer logout: " + error.message); }
     };
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -673,15 +544,11 @@ export default function App() {
             </div>
         );
     }
-
     return (
         <div>
             <AlertModal message={alertMessage} onClose={() => setAlertMessage('')} />
-            {user ? (
-                <FinancialManager user={user} onLogout={handleLogout} setAlertMessage={setAlertMessage} />
-            ) : (
-                <LoginScreen onLogin={handleLogin} />
-            )}
+            {user ? (<FinancialManager user={user} onLogout={handleLogout} setAlertMessage={setAlertMessage} />)
+                : (<LoginScreen onLogin={handleLogin} />)}
         </div>
     );
 }
