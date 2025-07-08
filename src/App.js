@@ -74,7 +74,6 @@ const Icon = ({ name, size = 24, className = '' }) => {
 
 const CategoryIcon = ({ category = '' }) => {
     const catLower = category.toLowerCase();
-
     if (catLower.includes('combustível')) return <Icon name="fuel" size={20} className="text-gray-500" />;
     if (catLower.includes('manutenção')) return <Icon name="wrench" size={20} className="text-gray-500" />;
     if (catLower.includes('alimentação')) return <Icon name="utensils" size={20} className="text-gray-500" />;
@@ -90,7 +89,6 @@ const CategoryIcon = ({ category = '' }) => {
     if (catLower.includes('fotografia')) return <Icon name="camera" size={20} className="text-gray-500" />;
     if (catLower.includes('investimento')) return <Icon name="trendingup" size={20} className="text-gray-500" />;
     if (catLower.includes('venda')) return <Icon name="tag" size={20} className="text-gray-500" />;
-    
     return <Icon name="morehorizontal" size={20} className="text-gray-500" />;
 };
 
@@ -100,131 +98,42 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => { 
 const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => { const [amount, setAmount] = useState(''); useEffect(() => { if (isOpen) { setAmount(''); } }, [isOpen]); if (!isOpen) return null; const remaining = debt.totalAmount - debt.paidAmount; return ( <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4"><div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full"><h3 className="text-lg font-bold mb-2">Registar Pagamento</h3><p className="text-sm text-gray-600 mb-4">Dívida: <span className="font-semibold">{debt.description}</span></p><label htmlFor="payment-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Pagamento</label><input id="payment-amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Restante: ${remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /><div className="flex justify-end gap-4 mt-6"><button onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button><button onClick={() => onConfirm(parseFloat(amount))} disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > remaining} className="py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400">Confirmar</button></div></div></div> ); };
 const SummaryCard = ({ title, value, iconName, colorClass }) => ( <div className="bg-white p-6 rounded-2xl shadow-md flex items-center space-x-4 transition-transform hover:scale-105"><div className={`p-3 rounded-full ${colorClass}`}><Icon name={iconName} size={24} className="currentColor" /></div><div><p className="text-sm text-gray-500">{title}</p><p className="text-2xl font-bold text-gray-800">{value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div></div> );
 const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, activeDebts, userId, expenseCategories = [], incomeCategories = [] }) => { const [description, setDescription] = useState(''); const [amount, setAmount] = useState(''); const [type, setType] = useState('expense'); const [category, setCategory] = useState(expenseCategories?.[0]?.name || ''); const [incomeSource, setIncomeSource] = useState(incomeCategories?.[0]?.name || ''); const [date, setDate] = useState(new Date().toISOString().split('T')[0]); const [linkedDebtId, setLinkedDebtId] = useState(''); const isEditing = !!transactionToEdit; useEffect(() => { if (isEditing) { setDescription(transactionToEdit.description); setAmount(transactionToEdit.amount); setType(transactionToEdit.type); setDate(transactionToEdit.timestamp.toDate().toISOString().split('T')[0]); if (transactionToEdit.type === 'expense') setCategory(transactionToEdit.category); else setIncomeSource(transactionToEdit.incomeSource); setLinkedDebtId(transactionToEdit.linkedDebtId || ''); } }, [transactionToEdit, isEditing]); useEffect(() => { if (!isEditing) { setCategory(expenseCategories?.[0]?.name || ''); } }, [expenseCategories, isEditing]); useEffect(() => { if (!isEditing) { setIncomeSource(incomeCategories?.[0]?.name || ''); } }, [incomeCategories, isEditing]); const resetForm = () => { setDescription(''); setAmount(''); setDate(new Date().toISOString().split('T')[0]); setTransactionToEdit(null); setLinkedDebtId(''); setCategory(expenseCategories?.[0]?.name || ''); setIncomeSource(incomeCategories?.[0]?.name || ''); setType('expense'); }; const handleSubmit = async (e) => { e.preventDefault(); if (!description || !amount || parseFloat(amount) <= 0) return; const transactionData = { description, amount: parseFloat(amount), type, timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')), ...(type === 'expense' && { category }), ...(type === 'income' && { incomeSource }), ...(category === 'Pagamento de Dívida' && linkedDebtId && { linkedDebtId }) }; await onSave(transactionData, transactionToEdit?.id); resetForm(); }; return ( <div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-xl font-bold text-gray-800 mb-4">{isEditing ? 'Editar Transação' : 'Adicionar Transação'}</h2><form onSubmit={handleSubmit} className="space-y-4">{!isEditing && ( <div><div className="flex bg-gray-100 rounded-full p-1"><button type="button" onClick={() => setType('expense')} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === 'expense' ? 'bg-red-500 text-white shadow' : 'text-gray-600'}`}>Despesa</button><button type="button" onClick={() => setType('income')} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === 'income' ? 'bg-green-500 text-white shadow' : 'text-gray-600'}`}>Receita</button></div></div> )}<div><label htmlFor="description" className="block text-sm font-medium text-gray-600 mb-1">Descrição</label><input id="description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={type === 'expense' ? 'Ex: Supermercado' : 'Ex: Job de fotografia'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div><div className="grid grid-cols-2 gap-4"><div><label htmlFor="amount" className="block text-sm font-medium text-gray-600 mb-1">Valor (R$)</label><input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div><div><label htmlFor="date" className="block text-sm font-medium text-gray-600 mb-1">Data</label><input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div></div><div>{type === 'expense' ? ( <> <label htmlFor="category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label> <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg"> {expenseCategories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)} <option value="Pagamento de Dívida">Pagamento de Dívida</option> </select> {category === 'Pagamento de Dívida' && !isEditing && ( <div className="mt-4"> <label htmlFor="linked-debt" className="block text-sm font-medium text-gray-600 mb-1">Associar Pagamento a Dívida (Opcional)</label> <select id="linked-debt" value={linkedDebtId} onChange={(e) => setLinkedDebtId(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg"><option value="">Pagamento Avulso</option>{activeDebts.map(debt => <option key={debt.id} value={debt.id}>{debt.description}</option>)}</select> </div> )} </> ) : ( <><label htmlFor="incomeSource" className="block text-sm font-medium text-gray-600 mb-1">Fonte da Receita</label> <select id="incomeSource" value={incomeSource} onChange={(e) => setIncomeSource(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg"> {incomeCategories.map(src => <option key={src.id} value={src.name}>{src.name}</option>)} </select></> )}</div><div className="flex items-center gap-4 pt-2"><button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">{isEditing ? 'Guardar Alterações' : 'Adicionar'}</button>{isEditing && (<button type="button" onClick={resetForm} className="w-full py-3 px-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300">Cancelar</button>)}</div></form></div> );};
+const TransactionItem = ({ transaction, onEdit, onDelete }) => { const isIncome = transaction.type === 'income'; const date = transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleDateString('pt-BR') : 'Data inválida'; return ( <li className="flex items-center justify-between p-4 bg-slate-50 rounded-xl transition-shadow hover:shadow-md"><div className="flex items-center space-x-4"><div className="flex items-center space-x-3"><Icon name={isIncome ? 'arrowupcircle' : 'arrowdowncircle'} className={isIncome ? 'text-green-500' : 'text-red-500'} size={24} />{isIncome ? <CategoryIcon category={transaction.incomeSource} /> : <CategoryIcon category={transaction.category} />}</div><div className="flex flex-col"><span className="font-semibold text-gray-800">{transaction.description}</span><span className="text-xs text-gray-500">{isIncome ? `Fonte: ${transaction.incomeSource}` : `Categoria: ${transaction.category}`}</span></div></div><div className="flex items-center space-x-2"><div className="text-right"><span className={`font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>{isIncome ? '+' : '-'} {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span><p className="text-xs text-gray-400">{date}</p></div><button onClick={() => onEdit(transaction)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition disabled:opacity-50" disabled={!!transaction.linkedDebtId}><Icon name="pencil" size={18} /></button><button onClick={() => onDelete(transaction.id, transaction)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button></div></li> ); };
 
-// ATUALIZADO: Lógica do TransactionItem para mostrar ícone de receita
-const TransactionItem = ({ transaction, onEdit, onDelete }) => {
-    const isIncome = transaction.type === 'income';
-    const date = transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleDateString('pt-BR') : 'Data inválida';
+// ATUALIZADO: ExpensePieChart com a legenda na lateral
+const ExpensePieChart = ({ data }) => {
+    const chartData = useMemo(() => {
+        const categoryTotals = data.filter(t => t.type === 'expense').reduce((acc, t) => {
+            const category = t.category || 'Sem Categoria';
+            acc[category] = (acc[category] || 0) + t.amount;
+            return acc;
+        }, {});
+        return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
+    }, [data]);
+
+    if (chartData.length === 0) {
+        return <div className="text-center text-gray-500 py-10 h-[300px] flex items-center justify-center">Sem dados de despesas para exibir no gráfico.</div>;
+    }
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943', '#19D4FF', '#FFD419', '#8884d8', '#82ca9d', '#d88488'];
 
     return (
-        <li className="flex items-center justify-between p-4 bg-slate-50 rounded-xl transition-shadow hover:shadow-md">
-            <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-3">
-                    <Icon name={isIncome ? 'arrowupcircle' : 'arrowdowncircle'} className={isIncome ? 'text-green-500' : 'text-red-500'} size={24} />
-                    {isIncome ? <CategoryIcon category={transaction.incomeSource} /> : <CategoryIcon category={transaction.category} />}
-                </div>
-                <div className="flex flex-col">
-                    <span className="font-semibold text-gray-800">{transaction.description}</span>
-                    <span className="text-xs text-gray-500">{isIncome ? `Fonte: ${transaction.incomeSource}` : `Categoria: ${transaction.category}`}</span>
-                </div>
-            </div>
-            <div className="flex items-center space-x-2">
-                <div className="text-right">
-                    <span className={`font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>{isIncome ? '+' : '-'} {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                    <p className="text-xs text-gray-400">{date}</p>
-                </div>
-                <button onClick={() => onEdit(transaction)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition disabled:opacity-50" disabled={!!transaction.linkedDebtId}>
-                    <Icon name="pencil" size={18} />
-                </button>
-                <button onClick={() => onDelete(transaction.id, transaction)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition">
-                    <Icon name="trash2" size={18} />
-                </button>
-            </div>
-        </li>
+        <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" cx="40%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} labelLine={false} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
+                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+                <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" />
+            </PieChart>
+        </ResponsiveContainer>
     );
 };
 
-const ExpensePieChart = ({ data }) => { const chartData = useMemo(() => { const categoryTotals = data.filter(t => t.type === 'expense').reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {}); return Object.entries(categoryTotals).map(([name, value]) => ({ name, value })); }, [data]); if (chartData.length === 0) return <div className="text-center text-gray-500 py-10">Sem dados de despesas para exibir.</div>; const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943', '#19D4FF', '#FFD419', '#8884d8', '#82ca9d', '#d88488']; return ( <ResponsiveContainer width="100%" height={300}><PieChart><Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} labelLine={false} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} /><Legend /></PieChart></ResponsiveContainer> ); };
 const DebtForm = ({ onSave }) => { const [description, setDescription] = useState(''); const [totalAmount, setTotalAmount] = useState(''); const resetForm = () => { setDescription(''); setTotalAmount(''); }; const handleSubmit = async (e) => { e.preventDefault(); if (!description || !totalAmount || parseFloat(totalAmount) <= 0) return; await onSave({ description, totalAmount: parseFloat(totalAmount), paidAmount: 0, status: 'active', createdAt: Timestamp.now() }); resetForm(); }; return ( <div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-gray-800 mb-4">Adicionar Nova Dívida</h3><form onSubmit={handleSubmit} className="space-y-4"><div><label htmlFor="debt-description" className="block text-sm font-medium text-gray-600 mb-1">Descrição da Dívida</label><input id="debt-description" type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Financiamento do Carro" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div><div><label htmlFor="debt-total" className="block text-sm font-medium text-gray-600 mb-1">Valor Total (R$)</label><input id="debt-total" type="number" step="0.01" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} placeholder="25000,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div><button type="submit" className="w-full py-3 px-4 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Adicionar Dívida</button></form></div> ); };
 const DebtItem = ({ debt, onPay, onDelete }) => { const { description, totalAmount, paidAmount } = debt; const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0; const remaining = totalAmount - paidAmount; return ( <li className="bg-slate-50 p-4 rounded-xl mb-3"><div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} / {totalAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span></div><div className="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div className="bg-teal-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div></div><div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div></li> ); };
 const Reports = ({ transactions }) => { const getMonthStartEnd = () => { const now = new Date(); const startDate = new Date(now.getFullYear(), now.getMonth(), 1); const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); return { start: startDate.toISOString().split('T')[0], end: endDate.toISOString().split('T')[0] }; }; const [startDate, setStartDate] = useState(getMonthStartEnd().start); const [endDate, setEndDate] = useState(getMonthStartEnd().end); const filteredTransactions = useMemo(() => { const start = new Date(startDate + 'T00:00:00'); const end = new Date(endDate + 'T23:59:59'); return transactions.filter(t => { const transDate = t.timestamp.toDate(); return transDate >= start && transDate <= end; }); }, [transactions, startDate, endDate]); const incomes = useMemo(() => filteredTransactions.filter(t => t.type === 'income'), [filteredTransactions]); const expenses = useMemo(() => filteredTransactions.filter(t => t.type === 'expense'), [filteredTransactions]); const totalIncome = useMemo(() => incomes.reduce((acc, t) => acc + t.amount, 0), [incomes]); const totalExpenses = useMemo(() => expenses.reduce((acc, t) => acc + t.amount, 0), [expenses]); const handlePrint = () => { window.print(); }; return ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><div className="bg-white p-6 rounded-2xl shadow-md no-print"><h2 className="text-2xl font-bold text-gray-800 mb-4">Relatório de Transações</h2><div className="flex flex-wrap items-center gap-4 mb-6"><div><label htmlFor="start-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Início</label><input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div><label htmlFor="end-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Fim</label><input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div className="self-end"><button onClick={handlePrint} className="flex items-center space-x-2 py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"><Icon name="printer" size={18} /><span>Imprimir</span></button></div></div></div><div className="mt-8 printable"><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-green-600 mb-4">Entradas</h3><ul className="space-y-2">{incomes.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Entradas:</span><span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-red-600 mb-4">Saídas</h3><ul className="space-y-2">{expenses.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Saídas:</span><span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div></div></div></main> ); };
-
-const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => {
-    const [newExpenseCat, setNewExpenseCat] = useState('');
-    const [newIncomeCat, setNewIncomeCat] = useState('');
-
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros'];
-    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
-
-    const handleAddExpense = (e) => { e.preventDefault(); if (newExpenseCat.trim()) { onAddCategory('expenseCategories', newExpenseCat.trim()); setNewExpenseCat(''); } };
-    const handleAddIncome = (e) => { e.preventDefault(); if (newIncomeCat.trim()) { onAddCategory('incomeCategories', newIncomeCat.trim()); setNewIncomeCat(''); } };
-
-    const userExpenseNames = useMemo(() => expenseCategories.map(c => c.name), [expenseCategories]);
-    const userIncomeNames = useMemo(() => incomeCategories.map(c => c.name), [incomeCategories]);
-
-    return (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <button onClick={() => setView('dashboard')} className="mb-6 inline-flex items-center gap-2 py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"><Icon name="arrowleft" size={18} /> Voltar</button>
-            <h1 className="text-3xl font-bold text-gray-800 mb-8"> Gerir Categorias </h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div>
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">Categorias de Despesa</h2>
-                    <div className="bg-white p-6 rounded-2xl shadow-md">
-                        <form onSubmit={handleAddExpense} className="flex gap-2 mb-4">
-                            <input type="text" value={newExpenseCat} onChange={(e) => setNewExpenseCat(e.target.value)} placeholder="Nova categoria de despesa" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
-                            <button type="submit" className="p-3 bg-red-500 text-white rounded-lg hover:bg-red-600"><Icon name="plus" /></button>
-                        </form>
-                        <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {expenseSuggestions.filter(s => !userExpenseNames.includes(s)).map(suggestion => (
-                                    <button key={suggestion} onClick={() => onAddCategory('expenseCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-                                        <CategoryIcon category={suggestion} /> {suggestion}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Categorias</h3>
-                        <ul className="space-y-3">
-                            {expenseCategories.length > 0 ? (
-                                expenseCategories.map(cat => (
-                                    <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <span className="font-medium text-gray-800">{cat.name}</span>
-                                        <button onClick={() => onDeleteCategory('expenseCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button>
-                                    </li>
-                                ))
-                            ) : (
-                                <p className="text-center text-gray-500 py-4">Nenhuma categoria de despesa encontrada.</p>
-                            )}
-                        </ul>
-                    </div>
-                </div>
-                <div>
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">Fontes de Receita</h2>
-                    <div className="bg-white p-6 rounded-2xl shadow-md">
-                        <form onSubmit={handleAddIncome} className="flex gap-2 mb-4">
-                            <input type="text" value={newIncomeCat} onChange={(e) => setNewIncomeCat(e.target.value)} placeholder="Nova fonte de receita" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
-                            <button type="submit" className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600"><Icon name="plus" /></button>
-                        </form>
-                        <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {incomeSuggestions.filter(s => !userIncomeNames.includes(s)).map(suggestion => (
-                                    <button key={suggestion} onClick={() => onAddCategory('incomeCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-                                        <CategoryIcon category={suggestion} /> {suggestion}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Fontes</h3>
-                        <ul className="space-y-3">
-                            {incomeCategories.length > 0 ? (
-                                incomeCategories.map(cat => (
-                                    <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <span className="font-medium text-gray-800">{cat.name}</span>
-                                        <button onClick={() => onDeleteCategory('incomeCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button>
-                                    </li>
-                                ))
-                            ) : (
-                                <p className="text-center text-gray-500 py-4">Nenhuma fonte de receita encontrada.</p>
-                            )}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </main>
-    );
-};
+const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => { const [newExpenseCat, setNewExpenseCat] = useState(''); const [newIncomeCat, setNewIncomeCat] = useState(''); const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros']; const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros']; const handleAddExpense = (e) => { e.preventDefault(); if (newExpenseCat.trim()) { onAddCategory('expenseCategories', newExpenseCat.trim()); setNewExpenseCat(''); } }; const handleAddIncome = (e) => { e.preventDefault(); if (newIncomeCat.trim()) { onAddCategory('incomeCategories', newIncomeCat.trim()); setNewIncomeCat(''); } }; const userExpenseNames = useMemo(() => expenseCategories.map(c => c.name), [expenseCategories]); const userIncomeNames = useMemo(() => incomeCategories.map(c => c.name), [incomeCategories]); return ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><button onClick={() => setView('dashboard')} className="mb-6 inline-flex items-center gap-2 py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"><Icon name="arrowleft" size={18} /> Voltar</button><h1 className="text-3xl font-bold text-gray-800 mb-8"> Gerir Categorias </h1><div className="grid grid-cols-1 md:grid-cols-2 gap-12"><div><h2 className="text-2xl font-semibold text-gray-700 mb-4">Categorias de Despesa</h2><div className="bg-white p-6 rounded-2xl shadow-md"><form onSubmit={handleAddExpense} className="flex gap-2 mb-4"><input type="text" value={newExpenseCat} onChange={(e) => setNewExpenseCat(e.target.value)} placeholder="Nova categoria de despesa" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg" required /><button type="submit" className="p-3 bg-red-500 text-white rounded-lg hover:bg-red-600"><Icon name="plus" /></button></form><div className="mb-6"><h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3><div className="flex flex-wrap gap-2">{expenseSuggestions.filter(s => !userExpenseNames.includes(s)).map(suggestion => ( <button key={suggestion} onClick={() => onAddCategory('expenseCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"><CategoryIcon category={suggestion} /> {suggestion}</button> ))}</div></div><h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Categorias</h3><ul className="space-y-3">{expenseCategories.length > 0 ? ( expenseCategories.map(cat => ( <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"><span className="font-medium text-gray-800">{cat.name}</span><button onClick={() => onDeleteCategory('expenseCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button></li> )) ) : ( <p className="text-center text-gray-500 py-4">Nenhuma categoria de despesa encontrada.</p> )}</ul></div></div><div><h2 className="text-2xl font-semibold text-gray-700 mb-4">Fontes de Receita</h2><div className="bg-white p-6 rounded-2xl shadow-md"><form onSubmit={handleAddIncome} className="flex gap-2 mb-4"><input type="text" value={newIncomeCat} onChange={(e) => setNewIncomeCat(e.target.value)} placeholder="Nova fonte de receita" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg" required /><button type="submit" className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600"><Icon name="plus" /></button></form><div className="mb-6"><h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3><div className="flex flex-wrap gap-2">{incomeSuggestions.filter(s => !userIncomeNames.includes(s)).map(suggestion => ( <button key={suggestion} onClick={() => onAddCategory('incomeCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"><CategoryIcon category={suggestion} /> {suggestion}</button>))}</div></div><h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Fontes</h3><ul className="space-y-3">{incomeCategories.length > 0 ? ( incomeCategories.map(cat => ( <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"><span className="font-medium text-gray-800">{cat.name}</span><button onClick={() => onDeleteCategory('incomeCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button></li> )) ) : ( <p className="text-center text-gray-500 py-4">Nenhuma fonte de receita encontrada.</p> )}</ul></div></div></div></main> ); };
 
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
@@ -273,20 +182,33 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
             
             {view === 'dashboard' && (
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="flex justify-end mb-4"><div className="flex bg-white rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Desde o Início</button></div></div>
                     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <SummaryCard title="Receitas" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" />
-                        <SummaryCard title="Despesas" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" />
-                        <SummaryCard title="Saldo" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" />
+                        <SummaryCard title="Receitas (Mês)" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" />
+                        <SummaryCard title="Despesas (Mês)" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" />
+                        <SummaryCard title="Saldo (Mês)" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" />
                         <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" />
                     </section>
+                    
+                    <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Distribuição de Despesas (Mês)</h2>
+                        <ExpensePieChart data={filteredTransactions} />
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
                         <div className="lg:col-span-2">
                             <TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} expenseCategories={expenseCategories} incomeCategories={incomeCategories}/>
                         </div>
                         <div className="lg:col-span-3">
-                            <div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-xl font-bold text-gray-800 mb-4">Distribuição de Despesas</h2><ExpensePieChart data={filteredTransactions} /></div>
-                            <div className="bg-white p-6 rounded-2xl shadow-md"><h2 className="text-xl font-bold text-gray-800 mb-4">Histórico de Transações</h2>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação neste período.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div>
+                            <div className="bg-white p-6 rounded-2xl shadow-md h-full">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-2xl font-bold text-gray-800">Histórico de Transações</h2>
+                                    <div className="flex bg-gray-100 rounded-full p-1 shadow-sm border">
+                                        <button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button>
+                                        <button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Tudo</button>
+                                    </div>
+                                </div>
+                                {transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg h-full flex flex-col justify-center"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação encontrada.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}
+                            </div>
                         </div>
                     </div>
                     <hr className="my-8" />
