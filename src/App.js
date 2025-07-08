@@ -33,7 +33,7 @@ function useDebts(userId) {
 }
 
 // --- COMPONENTES DE UI ---
-// ATUALIZADO: Componente Icon com mais ícones
+// ATUALIZADO: Componente Icon com todos os ícones necessários
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
         wallet: <path d="M21 12v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1" />,
@@ -46,12 +46,7 @@ const Icon = ({ name, size = 24, className = '' }) => {
         logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
         home: <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
         utensils: <><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Z" /></>,
-        car: <><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9L2.1 12.9A3 3 0 0 0 2 15v5c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path d="M9 17h6" /><circle cx="17" cy="17" r="2" /></>,
         popcorn: <><path d="M18 8a2 2 0 0 0 0-4 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0 0 4" /><path d="M18 12h-2" /><path d="M15 12h-2" /><path d="M12 12H8" /><path d="M8 12H6" /><path d="M6 12H4" /><path d="M20 12c0 5.523-4.477 10-10 10S0 17.523 0 12" transform="translate(2 0)" /></>,
-        graduationCap: <><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.084a1 1 0 0 0 0 1.838l8.57 3.908a2 2 0 0 0 1.66 0z" /><path d="M22 10v6" /><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" /></>,
-        shirt: <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />,
-        heartPulse: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /><path d="M3.22 12H9.5l.7-1 2.1 4.4 1.4-2.2H21" /></>,
-        receiptText: <><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M12 16H8" /></>,
         landmark: <><line x1="3" x2="21" y1="22" y2="22" /><line x1="6" x2="6" y1="18" y2="11" /><line x1="10" x2="10" y1="18" y2="11" /><line x1="14" x2="14" y1="18" y2="11" /><line x1="18" x2="18" y1="18" y2="11" /><polygon points="12 2 20 7 4 7" /></>,
         pencil: <><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></>,
         trash2: <><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></>,
@@ -64,27 +59,37 @@ const Icon = ({ name, size = 24, className = '' }) => {
         moreHorizontal: <><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></>,
         wrench: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
         fuel: <><line x1="3" x2="15" y1="22" y2="22" /><line x1="4" x2="14" y1="9" y2="9" /><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18" /><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2" /><path d="M4 13h6" /></>,
+        gift: <><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></>,
+        bookOpen: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></>,
+        heart: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />,
+        fileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>,
+        shoppingBag: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></>,
+        briefcase: <><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></>,
+        penTool: <><path d="m12 19 7-7 3 3-7 7-3-3z" /><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="m2 2 7.586 7.586" /><path d="m11 11 1 1" /></>,
+        trendingUp: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>,
+        camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>,
     };
     return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name.toLowerCase()] || <circle cx="12" cy="12" r="10" />}</svg>;
 };
 
-// ATUALIZADO: CategoryIcon com os novos mapeamentos
+// ATUALIZADO: CategoryIcon com todos os mapeamentos corretos
 const CategoryIcon = ({ category }) => {
     const categoryIcons = {
         'Moradia': 'home',
         'Alimentação': 'utensils',
         'Transporte - Combustível': 'fuel',
         'Transporte - Manutenção': 'wrench',
-        'Lazer': 'popcorn',
-        'Educação': 'graduationCap',
-        'Vestuário': 'shirt',
-        'Saúde': 'heartPulse',
-        'Contas': 'receiptText',
+        'Lazer': 'gift',
+        'Educação': 'bookOpen',
+        'Vestuário': 'shoppingBag',
+        'Saúde': 'heart',
+        'Contas': 'fileText',
         'Pagamento de Dívida': 'landmark',
-        'Investimentos': 'arrowUpCircle',
-        'Salário': 'dollarSign',
-        'Freelance': 'pencil',
+        'Salário': 'briefcase',
+        'Freelance': 'penTool',
+        'Investimentos': 'trendingUp',
         'Vendas': 'tag',
+        'Fotografia': 'camera',
         'Outros': 'moreHorizontal',
     };
     return <Icon name={categoryIcons[category] || 'moreHorizontal'} size={20} className="text-gray-500" />;
@@ -102,13 +107,13 @@ const DebtForm = ({ onSave }) => { const [description, setDescription] = useStat
 const DebtItem = ({ debt, onPay, onDelete }) => { const { description, totalAmount, paidAmount } = debt; const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0; const remaining = totalAmount - paidAmount; return ( <li className="bg-slate-50 p-4 rounded-xl mb-3"><div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} / {totalAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span></div><div className="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div className="bg-teal-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div></div><div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div></li> ); };
 const Reports = ({ transactions }) => { const getMonthStartEnd = () => { const now = new Date(); const startDate = new Date(now.getFullYear(), now.getMonth(), 1); const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); return { start: startDate.toISOString().split('T')[0], end: endDate.toISOString().split('T')[0] }; }; const [startDate, setStartDate] = useState(getMonthStartEnd().start); const [endDate, setEndDate] = useState(getMonthStartEnd().end); const filteredTransactions = useMemo(() => { const start = new Date(startDate + 'T00:00:00'); const end = new Date(endDate + 'T23:59:59'); return transactions.filter(t => { const transDate = t.timestamp.toDate(); return transDate >= start && transDate <= end; }); }, [transactions, startDate, endDate]); const incomes = useMemo(() => filteredTransactions.filter(t => t.type === 'income'), [filteredTransactions]); const expenses = useMemo(() => filteredTransactions.filter(t => t.type === 'expense'), [filteredTransactions]); const totalIncome = useMemo(() => incomes.reduce((acc, t) => acc + t.amount, 0), [incomes]); const totalExpenses = useMemo(() => expenses.reduce((acc, t) => acc + t.amount, 0), [expenses]); const handlePrint = () => { window.print(); }; return ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><div className="bg-white p-6 rounded-2xl shadow-md no-print"><h2 className="text-2xl font-bold text-gray-800 mb-4">Relatório de Transações</h2><div className="flex flex-wrap items-center gap-4 mb-6"><div><label htmlFor="start-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Início</label><input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div><label htmlFor="end-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Fim</label><input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg" /></div><div className="self-end"><button onClick={handlePrint} className="flex items-center space-x-2 py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"><Icon name="printer" size={18} /><span>Imprimir</span></button></div></div></div><div className="mt-8 printable"><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-green-600 mb-4">Entradas</h3><ul className="space-y-2">{incomes.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Entradas:</span><span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div><div className="bg-white p-6 rounded-2xl shadow-md"><h3 className="text-xl font-bold text-red-600 mb-4">Saídas</h3><ul className="space-y-2">{expenses.map(t => (<li key={t.id} className="flex justify-between items-center border-b pb-2"><span>{t.description}</span><span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}</ul><div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold"><span>Total de Saídas:</span><span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div></div></div></main> ); };
 
-// ATUALIZADO: SettingsPage com as novas sugestões de transporte
+// ATUALIZADO: SettingsPage com todas as sugestões
 const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory }) => {
     const [newExpenseCat, setNewExpenseCat] = useState('');
     const [newIncomeCat, setNewIncomeCat] = useState('');
 
     const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros'];
-    const incomeSuggestions = ['Salário', 'Freelance', 'Investimentos', 'Vendas', 'Outros'];
+    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
 
     const handleAddExpense = (e) => { e.preventDefault(); if (newExpenseCat.trim()) { onAddCategory('expenseCategories', newExpenseCat.trim()); setNewExpenseCat(''); } };
     const handleAddIncome = (e) => { e.preventDefault(); if (newIncomeCat.trim()) { onAddCategory('incomeCategories', newIncomeCat.trim()); setNewIncomeCat(''); } };
