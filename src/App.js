@@ -157,6 +157,316 @@ const LoginScreen = ({ onLogin }) => {
     );
 };
 
+// =============================================================================
+//  COMPONENTES DO PAINEL FINANCEIRO
+// =============================================================================
+
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+    if (!isOpen) return null;
+    return <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4"><div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full"><h3 className="text-lg font-bold mb-4">{title}</h3><p className="text-gray-600 mb-6">{message}</p><div className="flex justify-end gap-4"><button onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button><button onClick={onConfirm} className="py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600">Confirmar</button></div></div></div>;
+};
+
+const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => {
+    const [amount, setAmount] = useState('');
+    useEffect(() => { if(isOpen) { setAmount(''); } }, [isOpen]);
+    if (!isOpen) return null;
+    const remaining = debt.totalAmount - debt.paidAmount;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
+                <h3 className="text-lg font-bold mb-2">Registar Pagamento</h3><p className="text-sm text-gray-600 mb-4">Dívida: <span className="font-semibold">{debt.description}</span></p>
+                <label htmlFor="payment-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Pagamento</label><input id="payment-amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Restante: ${remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
+                <div className="flex justify-end gap-4 mt-6"><button onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button><button onClick={() => onConfirm(parseFloat(amount))} disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > remaining} className="py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400">Confirmar</button></div>
+            </div>
+        </div>
+    );
+};
+
+const SummaryCard = ({ title, value, iconName, colorClass }) => (
+    <div className="bg-white p-6 rounded-2xl shadow-md flex items-center space-x-4 transition-transform hover:scale-105">
+        <div className={`p-3 rounded-full ${colorClass}`}>
+            <Icon name={iconName} size={24} className="currentColor" />
+        </div>
+        <div>
+            <p className="text-sm text-gray-500">{title}</p>
+            <p className="text-2xl font-bold text-gray-800">{value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+        </div>
+    </div>
+);
+
+const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, activeDebts, userId }) => {
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [type, setType] = useState(TRANSACTION_TYPES.EXPENSE);
+    const [category, setCategory] = useState(EXPENSE_CATEGORIES[1]); // Alimentação
+    const [incomeSource, setIncomeSource] = useState(INCOME_SOURCES[0]); // Salário
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [linkedDebtId, setLinkedDebtId] = useState('');
+    const isEditing = !!transactionToEdit;
+
+    useEffect(() => {
+        if (isEditing) {
+            setDescription(transactionToEdit.description);
+            setAmount(transactionToEdit.amount);
+            setType(transactionToEdit.type);
+            setDate(transactionToEdit.timestamp.toDate().toISOString().split('T')[0]);
+            if(transactionToEdit.type === TRANSACTION_TYPES.EXPENSE) setCategory(transactionToEdit.category);
+            else setIncomeSource(transactionToEdit.incomeSource);
+            setLinkedDebtId(transactionToEdit.linkedDebtId || '');
+        }
+    }, [transactionToEdit, isEditing]);
+
+    const resetForm = () => {
+        setDescription(''); setAmount(''); setDate(new Date().toISOString().split('T')[0]); setTransactionToEdit(null); setLinkedDebtId(''); setCategory(EXPENSE_CATEGORIES[1]); setType(TRANSACTION_TYPES.EXPENSE);
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!description || !amount || parseFloat(amount) <= 0) return;
+        const transactionData = { 
+            description, amount: parseFloat(amount), type, 
+            timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')), 
+            ...(type === TRANSACTION_TYPES.EXPENSE && { category }), 
+            ...(type === TRANSACTION_TYPES.INCOME && { incomeSource }), 
+            ...(category === 'Pagamento de Dívida' && linkedDebtId && { linkedDebtId })
+        };
+        await onSave(transactionData, transactionToEdit?.id);
+        resetForm();
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">{isEditing ? 'Editar Transação' : 'Adicionar Transação'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {!isEditing && (
+                    <div><div className="flex bg-gray-100 rounded-full p-1"><button type="button" onClick={() => setType(TRANSACTION_TYPES.EXPENSE)} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === TRANSACTION_TYPES.EXPENSE ? 'bg-red-500 text-white shadow' : 'text-gray-600'}`}>Despesa</button><button type="button" onClick={() => setType(TRANSACTION_TYPES.INCOME)} className={`w-full py-2 px-4 rounded-full font-semibold transition ${type === TRANSACTION_TYPES.INCOME ? 'bg-green-500 text-white shadow' : 'text-gray-600'}`}>Receita</button></div></div>
+                )}
+                <div><label htmlFor="description" className="block text-sm font-medium text-gray-600 mb-1">Descrição</label><input id="description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={type === TRANSACTION_TYPES.EXPENSE ? 'Ex: Supermercado' : 'Ex: Job de fotografia'} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><label htmlFor="amount" className="block text-sm font-medium text-gray-600 mb-1">Valor (R$)</label><input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                    <div><label htmlFor="date" className="block text-sm font-medium text-gray-600 mb-1">Data</label><input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                </div>
+                <div>
+                    {type === TRANSACTION_TYPES.EXPENSE ? (
+                        <>
+                            <label htmlFor="category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
+                            <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">{EXPENSE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select>
+                            {category === 'Pagamento de Dívida' && !isEditing && (
+                                <div className="mt-4">
+                                    <label htmlFor="linked-debt" className="block text-sm font-medium text-gray-600 mb-1">Associar Pagamento a Dívida (Opcional)</label>
+                                    <select id="linked-debt" value={linkedDebtId} onChange={(e) => setLinkedDebtId(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg"><option value="">Pagamento Avulso</option>{activeDebts.map(debt => <option key={debt.id} value={debt.id}>{debt.description}</option>)}</select>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <><label htmlFor="incomeSource" className="block text-sm font-medium text-gray-600 mb-1">Fonte da Receita</label><select id="incomeSource" value={incomeSource} onChange={(e) => setIncomeSource(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">{INCOME_SOURCES.map(src => <option key={src} value={src}>{src}</option>)}</select></>
+                    )}
+                </div>
+                <div className="flex items-center gap-4 pt-2">
+                    <button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">{isEditing ? 'Guardar Alterações' : 'Adicionar'}</button>
+                    {isEditing && (<button type="button" onClick={resetForm} className="w-full py-3 px-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300">Cancelar</button>)}
+                </div>
+            </form>
+        </div>
+    );
+};
+
+const TransactionItem = ({ transaction, onEdit, onDelete }) => {
+    const isIncome = transaction.type === TRANSACTION_TYPES.INCOME;
+    const date = transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleDateString('pt-BR') : 'Data inválida';
+
+    return (
+        <li className="flex items-center justify-between p-4 bg-slate-50 rounded-xl transition-shadow hover:shadow-md">
+            <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
+                    <Icon name={isIncome ? 'arrowUpCircle' : 'arrowDownCircle'} className={isIncome ? 'text-green-500' : 'text-red-500'} size={24} />
+                    {!isIncome && <CategoryIcon category={transaction.category} />}
+                </div>
+                <div className="flex flex-col">
+                    <span className="font-semibold text-gray-800">{transaction.description}</span>
+                    <span className="text-xs text-gray-500">{isIncome ? `Fonte: ${transaction.incomeSource}` : `Categoria: ${transaction.category}`}</span>
+                </div>
+            </div>
+            <div className="flex items-center space-x-2">
+                <div className="text-right">
+                    <span className={`font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>{isIncome ? '+' : '-'} {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <p className="text-xs text-gray-400">{date}</p>
+                </div>
+                <button onClick={() => onEdit(transaction)} className="p-2 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-full transition disabled:opacity-50" disabled={!!transaction.linkedDebtId}><Icon name="pencil" size={18} /></button>
+                <button onClick={() => onDelete(transaction.id, transaction)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button>
+            </div>
+        </li>
+    );
+};
+
+const ExpensePieChart = ({ data }) => {
+    const chartData = useMemo(() => {
+        const categoryTotals = data.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {});
+        return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
+    }, [data]);
+    if (chartData.length === 0) return <div className="text-center text-gray-500 py-10">Sem dados de despesas para exibir.</div>;
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943', '#19D4FF', '#FFD419', '#8884d8', '#82ca9d', '#d88488'];
+    return (
+        <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} labelLine={false} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}>
+                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/>
+                <Legend />
+            </PieChart>
+        </ResponsiveContainer>
+    );
+};
+
+const DebtForm = ({ onSave }) => {
+    const [description, setDescription] = useState('');
+    const [totalAmount, setTotalAmount] = useState('');
+    
+    const resetForm = () => { setDescription(''); setTotalAmount(''); };
+
+    const handleSubmit = async (e) => { 
+        e.preventDefault(); 
+        if (!description || !totalAmount || parseFloat(totalAmount) <= 0) return; 
+        await onSave({ description, totalAmount: parseFloat(totalAmount), paidAmount: 0, status: DEBT_STATUS.ACTIVE, createdAt: Timestamp.now() }); 
+        resetForm();
+    };
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-md">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Adicionar Nova Dívida</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div><label htmlFor="debt-description" className="block text-sm font-medium text-gray-600 mb-1">Descrição da Dívida</label><input id="debt-description" type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Financiamento do Carro" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                <div><label htmlFor="debt-total" className="block text-sm font-medium text-gray-600 mb-1">Valor Total (R$)</label><input id="debt-total" type="number" step="0.01" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} placeholder="25000,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required /></div>
+                <button type="submit" className="w-full py-3 px-4 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700">Adicionar Dívida</button>
+            </form>
+        </div>
+    );
+};
+
+const DebtItem = ({ debt, onPay, onDelete }) => {
+    const { description, totalAmount, paidAmount } = debt;
+    const progress = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+    const remaining = totalAmount - paidAmount;
+    return (
+        <li className="bg-slate-50 p-4 rounded-xl mb-3">
+            <div className="flex justify-between items-center mb-2"><span className="font-semibold text-gray-800">{description}</span><span className="text-sm font-mono text-gray-600">{paidAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} / {totalAmount.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span></div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2"><div className="bg-teal-500 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div></div>
+            <div className="flex justify-between items-center"><span className="text-xs text-gray-500">Restante: {remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</span><div><button onClick={() => onPay(debt)} className="py-1 px-3 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 mr-2">Pagar</button><button onClick={() => onDelete(debt.id, debt)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={16} /></button></div></div>
+        </li>
+    );
+};
+
+const PaymentModal = ({ isOpen, onClose, onConfirm, debt }) => {
+    const [amount, setAmount] = useState('');
+    useEffect(() => { if(isOpen) { setAmount(''); } }, [isOpen]);
+    if (!isOpen) return null;
+    const remaining = debt.totalAmount - debt.paidAmount;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
+                <h3 className="text-lg font-bold mb-2">Registar Pagamento</h3><p className="text-sm text-gray-600 mb-4">Dívida: <span className="font-semibold">{debt.description}</span></p>
+                <label htmlFor="payment-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Pagamento</label><input id="payment-amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Restante: ${remaining.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
+                <div className="flex justify-end gap-4 mt-6"><button onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button><button onClick={() => onConfirm(parseFloat(amount))} disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > remaining} className="py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400">Confirmar</button></div>
+            </div>
+        </div>
+    );
+};
+
+const Reports = ({ transactions }) => {
+    const getMonthStartEnd = () => {
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return {
+            start: startDate.toISOString().split('T')[0],
+            end: endDate.toISOString().split('T')[0]
+        };
+    };
+
+    const [startDate, setStartDate] = useState(getMonthStartEnd().start);
+    const [endDate, setEndDate] = useState(getMonthStartEnd().end);
+
+    const filteredTransactions = useMemo(() => {
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(endDate + 'T23:59:59');
+        return transactions.filter(t => {
+            const transDate = t.timestamp.toDate();
+            return transDate >= start && transDate <= end;
+        });
+    }, [transactions, startDate, endDate]);
+
+    const incomes = useMemo(() => filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.INCOME), [filteredTransactions]);
+    const expenses = useMemo(() => filteredTransactions.filter(t => t.type === TRANSACTION_TYPES.EXPENSE), [filteredTransactions]);
+    const totalIncome = useMemo(() => incomes.reduce((acc, t) => acc + t.amount, 0), [incomes]);
+    const totalExpenses = useMemo(() => expenses.reduce((acc, t) => acc + t.amount, 0), [expenses]);
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    return (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="bg-white p-6 rounded-2xl shadow-md no-print">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Relatório de Transações</h2>
+                <div className="flex flex-wrap items-center gap-4 mb-6">
+                    <div>
+                        <label htmlFor="start-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Início</label>
+                        <input id="start-date" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg"/>
+                    </div>
+                    <div>
+                        <label htmlFor="end-date" className="block text-sm font-medium text-gray-600 mb-1">Data de Fim</label>
+                        <input id="end-date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg"/>
+                    </div>
+                    <div className="self-end">
+                        <button onClick={handlePrint} className="flex items-center space-x-2 py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
+                            <Icon name="printer" size={18} />
+                            <span>Imprimir</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-8 printable">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-white p-6 rounded-2xl shadow-md">
+                        <h3 className="text-xl font-bold text-green-600 mb-4">Entradas</h3>
+                        <ul className="space-y-2">
+                            {incomes.map(t => (
+                                <li key={t.id} className="flex justify-between items-center border-b pb-2">
+                                    <span>{t.description}</span>
+                                    <span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold">
+                            <span>Total de Entradas:</span>
+                            <span>{totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-md">
+                        <h3 className="text-xl font-bold text-red-600 mb-4">Saídas</h3>
+                        <ul className="space-y-2">
+                            {expenses.map(t => (
+                                <li key={t.id} className="flex justify-between items-center border-b pb-2">
+                                    <span>{t.description}</span>
+                                    <span className="font-semibold">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="flex justify-between items-center mt-4 pt-2 border-t-2 font-bold">
+                            <span>Total de Saídas:</span>
+                            <span>{totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    );
+};
+
+// =============================================================================
+//  COMPONENTE PRINCIPAL DO PAINEL
+// =============================================================================
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const debts = useDebts(user.uid);
@@ -322,7 +632,7 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                         <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800"/>
                     </section>
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-                        <div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} /></div>
+                        <div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} /></div>
                         <div className="lg:col-span-3">
                             <div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-xl font-bold text-gray-800 mb-4">Distribuição de Despesas</h2><ExpensePieChart data={filteredTransactions} /></div>
                             <div className="bg-white p-6 rounded-2xl shadow-md"><h2 className="text-xl font-bold text-gray-800 mb-4">Histórico de Transações</h2>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg"><Icon name="receiptText" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação neste período.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div>
@@ -343,8 +653,6 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
         </div>
     );
 };
-
-// ... (Restante dos componentes)
 
 // =============================================================================
 //  COMPONENTE PRINCIPAL (Wrapper da Aplicação)
