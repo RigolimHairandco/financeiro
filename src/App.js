@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import FinancialManager from './FinancialManager'; // Importa o painel principal
 
 // =============================================================================
 //  CONFIGURAÇÃO DO FIREBASE
@@ -18,50 +17,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
 // =============================================================================
-//  HOOKS PERSONALIZADOS
-// =============================================================================
-function useAuth() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
-    return { user, loading };
-}
-
-// =============================================================================
-//  COMPONENTES DE UI
+//  COMPONENTES BÁSICOS
 // =============================================================================
 const Icon = ({ name, size = 24, className = '' }) => {
     const icons = {
         wallet: <path d="M21 12v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1" />,
         eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
         eyeOff: <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></>,
-        logOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></>,
     };
     return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name.toLowerCase()] || <circle cx="12" cy="12" r="10" />}</svg>;
-};
-
-const AlertModal = ({ message, onClose }) => {
-    if (!message) return null;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-            <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center">
-                <h3 className="text-xl font-bold mb-4 text-gray-800">Aviso</h3>
-                <p className="text-gray-600 mb-6">{message}</p>
-                <div className="flex justify-center">
-                    <button onClick={onClose} className="py-2 px-8 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">OK</button>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 const LoginScreen = ({ onLogin }) => {
@@ -100,42 +66,22 @@ const LoginScreen = ({ onLogin }) => {
     );
 };
 
-const FinancialManager = ({ user, onLogout }) => {
-    return (
-        <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
-            <header className="bg-white shadow-sm sticky top-0 z-20">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-                    <div className="flex items-center space-x-3">
-                        <Icon name="wallet" className="text-indigo-600" size={32} />
-                        <h1 className="text-xl md:text-2xl font-bold text-gray-800">O Meu Gestor</h1>
-                    </div>
-                    <div className="flex items-center space-x-2 md:space-x-4">
-                       <div className="text-right">
-                         <p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p>
-                       </div>
-                       <button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors">
-                         <Icon name="logOut" size={20} />
-                       </button>
-                    </div>
-                </div>
-            </header>
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-800">Bem-vindo!</h2>
-                    <p className="mt-2 text-gray-600">Funcionalidades removidas conforme solicitado.</p>
-                </div>
-            </main>
-        </div>
-    );
-};
-
 // =============================================================================
-//  COMPONENTE PRINCIPAL (Wrapper da Aplicação)
+//  COMPONENTE PRINCIPAL
 // =============================================================================
 export default function App() {
-    const { user, loading } = useAuth();
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [alertMessage, setAlertMessage] = useState('');
-    
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
