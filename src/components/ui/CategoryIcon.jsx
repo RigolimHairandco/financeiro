@@ -3,7 +3,6 @@ import Icon from './Icon';
 
 const CategoryIcon = ({ category = '' }) => {
     const catLower = category.toLowerCase();
-
     if (catLower.includes('combustível')) return <Icon name="fuel" size={20} className="text-gray-500" />;
     if (catLower.includes('manutenção')) return <Icon name="wrench" size={20} className="text-gray-500" />;
     if (catLower.includes('alimentação')) return <Icon name="utensils" size={20} className="text-gray-500" />;
