@@ -37,6 +37,7 @@ const Icon = ({ name, size = 24, className = '' }) => {
         camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>,
         flag: <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />,
         checkcircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>,
+        "piggy-bank": <><path d="M15.5 6.5a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1V5a1 1 0 0 1-1 1h-1z" /><path d="M5.5 6.5a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1V5a1 1 0 0 1-1 1h-1z" /><path d="M12 12.5a1 1 0 0 0-1-1h-1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1z" /><path d="M20 18.5a4.5 4.5 0 0 0-4.5-4.5H8.5A4.5 4.5 0 0 0 4 18.5V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5z" /></>,
     };
     return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name.toLowerCase()] || <circle cx="12" cy="12" r="10" />}</svg>;
 };
