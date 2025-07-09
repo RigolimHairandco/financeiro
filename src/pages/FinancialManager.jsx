@@ -20,7 +20,6 @@ import GoalItem from '../components/goals/GoalItem.jsx';
 import Reports from './Reports.jsx';
 import SettingsPage from './SettingsPage.jsx';
 
-// A prop 'setNotification' foi trocada de volta para 'setAlertMessage'
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const recurringTransactions = useRecurringTransactions(user.uid);
