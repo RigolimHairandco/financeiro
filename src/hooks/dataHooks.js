@@ -27,3 +27,27 @@ export function useDebts(userId) {
     }, [userId]);
     return debts;
 }
+
+export function useBudgets(userId) {
+    const [budgets, setBudgets] = useState([]);
+    useEffect(() => {
+        if (!userId) {
+            setBudgets([]);
+            return;
+        }
+        const currentMonth = new Date().toLocaleString('default', { month: '2-digit' });
+        const currentYear = new Date().getFullYear();
+        const monthYear = `${currentYear}-${currentMonth}`;
+
+        const q = query(collection(db, `users/${userId}/budgets`));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const userBudgets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Filtramos para mostrar apenas os orçamentos do mês/ano atual
+            setBudgets(userBudgets.filter(b => b.month === monthYear));
+        });
+        
+        return () => unsubscribe();
+    }, [userId]);
+    return budgets;
+}
