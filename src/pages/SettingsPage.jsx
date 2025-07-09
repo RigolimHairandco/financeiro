@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'; // <--- CORREÇÃO 1: useEffect adicionado aqui
+import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '../components/ui/Icon.jsx';
 import CategoryIcon from '../components/ui/CategoryIcon.jsx';
 
@@ -9,12 +9,10 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
     const [budgetCategory, setBudgetCategory] = useState(expenseCategories[0]?.name || '');
     const [budgetAmount, setBudgetAmount] = useState('');
 
-    // CORREÇÃO 2: As listas de sugestões foram adicionadas aqui
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Outros'];
+    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Poupança', 'Outros'];
     const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
 
     useEffect(() => {
-        // Garante que uma categoria seja selecionada por padrão no formulário de orçamento
         if (expenseCategories.length > 0 && !budgetCategory) {
             setBudgetCategory(expenseCategories[0].name);
         }
