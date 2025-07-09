@@ -7,18 +7,18 @@ export function useTransactions(userId) {
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
         
-        // CORREÇÃO: Buscamos todas as transações, sem o filtro 'where'.
-        const q = query(collection(db, `users/${userId}/transactions`), orderBy("timestamp", "desc"));
+        // CORREÇÃO APLICADA AQUI:
+        // Em vez de "==", usamos "!=" para incluir transações antigas.
+        const q = query(
+            collection(db, `users/${userId}/transactions`), 
+            where("isRecurring", "!=", true) 
+        );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // O filtro agora é feito aqui, garantindo que transações antigas (sem o campo) sejam incluídas.
-            const normalTransactions = allTransactions.filter(t => t.isRecurring !== true);
-
-            setTransactions(normalTransactions);
-        }, (error) => {
-            console.error("Erro no listener de transações: ", error);
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Ordenamos por data aqui no código para evitar problemas com índices do Firestore
+            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
+            setTransactions(fetchedTransactions);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -29,12 +29,9 @@ export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
     useEffect(() => {
         if (!userId) { setRecurring([]); return; }
-        // Esta busca continua correta, pois queremos apenas as que são recorrentes.
         const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => {
-            console.error("Erro no listener de transações recorrentes: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -48,8 +45,6 @@ export function useDebts(userId) {
         const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => {
-            console.error("Erro no listener de dívidas: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -67,12 +62,11 @@ export function useBudgets(userId) {
         const currentYear = new Date().getFullYear();
         const monthYear = `${currentYear}-${currentMonth}`;
 
-        const q = query(collection(db, `users/${userId}/budgets`), where("month", "==", monthYear));
+        const q = query(collection(db, `users/${userId}/budgets`));
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => {
-            console.error("Erro no listener de orçamentos: ", error);
+            const userBudgets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setBudgets(userBudgets.filter(b => b.month === monthYear));
         });
         
         return () => unsubscribe();
@@ -87,8 +81,6 @@ export function useGoals(userId) {
         const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => {
-            console.error("Erro no listener de metas: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
