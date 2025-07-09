@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { db } from '../firebase';
-import { useTransactions, useDebts } from '../hooks/hooks'; // Assumindo que os hooks estarão em 'hooks.js'
+import { useTransactions, useDebts } from '../hooks/dataHooks';
 import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories';
 import { useWindowSize } from '../hooks/useWindowSize';
 import Icon from '../components/ui/Icon';
@@ -16,23 +16,74 @@ import DebtItem from '../components/debts/DebtItem';
 import Reports from './Reports';
 import SettingsPage from './SettingsPage';
 
+// Componente do Gráfico movido para dentro para simplificar as props
+const ExpensePieChart = ({ data }) => {
+    const { width } = useWindowSize();
+    const isMobile = width < 768;
+
+    const chartData = useMemo(() => {
+        const categoryTotals = data.filter(t => t.type === 'expense').reduce((acc, t) => {
+            const category = t.category || 'Sem Categoria';
+            acc[category] = (acc[category] || 0) + t.amount;
+            return acc;
+        }, {});
+        return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
+    }, [data]);
+
+    if (chartData.length === 0) {
+        return <div className="text-center text-gray-500 py-10 h-[300px] flex items-center justify-center">Sem dados de despesas para exibir no gráfico.</div>;
+    }
+
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943', '#19D4FF', '#FFD419', '#8884d8', '#82ca9d', '#d88488'];
+
+    return (
+        <ResponsiveContainer width="100%" height={isMobile ? 400 : 300}>
+            <PieChart>
+                <Pie
+                    data={chartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx={isMobile ? "50%" : "40%"}
+                    cy="50%"
+                    innerRadius={isMobile ? 50 : 60}
+                    outerRadius={isMobile ? 70 : 80}
+                    fill="#8884d8"
+                    paddingAngle={5}
+                    labelLine={false}
+                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                >
+                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+                <Legend
+                    layout={isMobile ? 'horizontal' : 'vertical'}
+                    verticalAlign={isMobile ? 'bottom' : 'middle'}
+                    align={isMobile ? 'center' : 'right'}
+                    wrapperStyle={isMobile ? { paddingTop: '20px' } : {}}
+                    iconType="circle"
+                />
+            </PieChart>
+        </ResponsiveContainer>
+    );
+};
+
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const debts = useDebts(user.uid);
     const expenseCategories = useExpenseCategories(user.uid);
     const incomeCategories = useIncomeCategories(user.uid);
     const [transactionToEdit, setTransactionToEdit] = useState(null);
-    const [itemToDelete, setItemToDelete] = useState({id: null, type: null, data: null});
+    const [itemToDelete, setItemToDelete] = useState({ id: null, type: null, data: null });
     const [filterPeriod, setFilterPeriod] = useState('month');
     const [debtToPay, setDebtToPay] = useState(null);
     const [view, setView] = useState('dashboard');
 
     const handleAddCategory = async (collectionName, categoryName) => { if (!categoryName) return; try { await addDoc(collection(db, `users/${user.uid}/${collectionName}`), { name: categoryName }); } catch (e) { console.error("Erro ao adicionar categoria:", e); setAlertMessage("Ocorreu um erro ao adicionar a categoria."); } };
     const handleDeleteCategory = async (collectionName, categoryId) => { if (!categoryId) return; try { await deleteDoc(doc(db, `users/${user.uid}/${collectionName}`, categoryId)); } catch (e) { console.error("Erro ao apagar categoria:", e); setAlertMessage("Ocorreu um erro ao apagar a categoria."); } };
-    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId) { setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova."); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage("Ocorreu um erro ao guardar a transação."); } };
+    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if (data.linkedDebtId) { setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova."); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage("Ocorreu um erro ao guardar a transação."); } };
     const handleSaveDebt = async (data) => { try { await addDoc(collection(db, `users/${user.uid}/debts`), data); } catch (e) { console.error("Erro ao guardar dívida:", e); setAlertMessage("Ocorreu um erro ao guardar a dívida."); } };
-    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
-    const handleDelete = async () => { if (!itemToDelete.id) return; const { id, type, data } = itemToDelete; const batch = writeBatch(db); const path = `users/${user.uid}/${type}s`; const docRef = doc(db, path, id); try { if (type === 'transaction' && data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - data.amount; batch.update(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setAlertMessage("Não é possível apagar uma dívida com pagamentos registados. Apague primeiro os pagamentos."); setItemToDelete({id: null, type: null, data: null}); return; } } batch.delete(docRef); await batch.commit(); } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage("Ocorreu um erro ao apagar."); } finally { setItemToDelete({id: null, type: null, data: null}); } };
+    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({ id, type, data });
+    const handleDelete = async () => { if (!itemToDelete.id) return; const { id, type, data } = itemToDelete; const batch = writeBatch(db); const path = `users/${user.uid}/${type}s`; const docRef = doc(db, path, id); try { if (type === 'transaction' && data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - data.amount; batch.update(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setAlertMessage("Não é possível apagar uma dívida com pagamentos registados. Apague primeiro os pagamentos."); setItemToDelete({ id: null, type: null, data: null }); return; } } batch.delete(docRef); await batch.commit(); } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage("Ocorreu um erro ao apagar."); } finally { setItemToDelete({ id: null, type: null, data: null }); } };
     const handleMakePayment = async (paymentAmount) => { if (!debtToPay || !paymentAmount || paymentAmount <= 0) return; const batch = writeBatch(db); const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, { description: `Pagamento: ${debtToPay.description}`.toUpperCase(), amount: paymentAmount, type: 'expense', category: 'Pagamento de Dívida', timestamp: Timestamp.now(), linkedDebtId: debtToPay.id }); const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id); const newPaidAmount = debtToPay.paidAmount + paymentAmount; const newStatus = newPaidAmount >= debtToPay.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); try { await batch.commit(); setDebtToPay(null); } catch (e) { console.error("Erro ao processar pagamento:", e); setAlertMessage("Ocorreu um erro ao processar o pagamento."); } };
     
     const filteredTransactions = useMemo(() => { if (filterPeriod === 'month') { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
@@ -42,7 +93,7 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
-            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({id: null, type: null, data: null})} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
+            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({ id: null, type: null, data: null })} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
             <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
             <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
