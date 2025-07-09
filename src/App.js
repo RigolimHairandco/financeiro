@@ -14,6 +14,7 @@ export default function App() {
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            setNotification({ message: "Login efetuado com sucesso!", type: 'success' });
         } catch (error) {
             setNotification({ message: "Falha no login: Verifique as suas credenciais.", type: 'error' });
         }
