@@ -6,13 +6,17 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
+        
+        // CORREÇÃO: A query agora busca transações onde 'isRecurring' é DIFERENTE de 'true'.
+        // Isso inclui as transações antigas (onde o campo não existe) e as novas não recorrentes.
         const q = query(
             collection(db, `users/${userId}/transactions`), 
-            where("isRecurring", "!=", true) 
+            where("isRecurring", "!=", true)
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Ordenamos por data aqui no código para ser mais robusto
             fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
             setTransactions(fetchedTransactions);
         }, (error) => {
