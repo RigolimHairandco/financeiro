@@ -50,7 +50,7 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
                         <div>
                             <label htmlFor="budget-category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
                             <select id="budget-category" value={budgetCategory} onChange={e => setBudgetCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                {expenseCategories.filter(cat => !budgetedCategoryNames.includes(cat.name)).map(cat => (
+                                {expenseCategories.filter(cat => !budgetedCategoryNames.includes(cat.name) && cat.name !== 'Poupança').map(cat => (
                                     <option key={cat.id} value={cat.name}>{cat.name}</option>
                                 ))}
                             </select>
