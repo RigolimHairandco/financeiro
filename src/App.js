@@ -1,30 +1,32 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { Toaster, toast } from 'react-hot-toast';
 import { auth } from './firebase';
 import { useAuth } from './hooks/useAuth';
-import Notification from './components/modals/Notification.jsx';
 import LoginScreen from './pages/LoginScreen.jsx';
 import FinancialManager from './pages/FinancialManager.jsx';
 import Icon from './components/ui/Icon.jsx';
 
+// O AlertModal foi removido pois agora usamos o react-hot-toast
+
 export default function App() {
     const { user, loading } = useAuth();
-    const [notification, setNotification] = useState(null);
 
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            toast.success("Login efetuado com sucesso!");
         } catch (error) {
-            setNotification({ message: "Falha no login: Verifique as suas credenciais.", type: 'error' });
+            toast.error("Falha no login: Verifique as suas credenciais.");
         }
     };
 
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            setNotification({ message: "Sessão terminada com sucesso!", type: 'success' });
+            toast.success("Sessão terminada com sucesso!");
         } catch (error) {
-            setNotification({ message: "Erro ao fazer logout.", type: 'error' });
+            toast.error("Erro ao fazer logout.");
         }
     };
 
@@ -41,10 +43,22 @@ export default function App() {
 
     return (
         <div>
-            <Notification notification={notification} onClear={() => setNotification(null)} />
+            {/* Este componente renderiza todas as notificações toast */}
+            <Toaster 
+                position="top-center"
+                reverseOrder={false}
+                toastOptions={{
+                    duration: 3000,
+                    style: {
+                        background: '#363636',
+                        color: '#fff',
+                    },
+                }}
+            />
             
             {user ? (
-                <FinancialManager user={user} onLogout={handleLogout} setNotification={setNotification} />
+                // A prop de notificação foi removida, pois o FinancialManager agora usa o toast diretamente
+                <FinancialManager user={user} onLogout={handleLogout} />
             ) : (
                 <LoginScreen onLogin={handleLogin} />
             )}
