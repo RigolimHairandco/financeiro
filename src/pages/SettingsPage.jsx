@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import Icon from '../components/ui/Icon';
-import CategoryIcon from '../components/ui/CategoryIcon';
+import Icon from '../components/ui/Icon.jsx';
+import CategoryIcon from '../components/ui/CategoryIcon.jsx';
 
 const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onSaveBudget, onDeleteBudget, budgets = [] }) => {
     const [newExpenseCat, setNewExpenseCat] = useState('');
