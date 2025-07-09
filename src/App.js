@@ -7,13 +7,15 @@ import LoginScreen from './pages/LoginScreen.jsx';
 import FinancialManager from './pages/FinancialManager.jsx';
 import Icon from './components/ui/Icon.jsx';
 
+// O AlertModal foi removido pois agora usamos o react-hot-toast
+
 export default function App() {
     const { user, loading } = useAuth();
 
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            toast.success("Login efetuado com sucesso!");
+            // A notificação de sucesso agora é mostrada dentro do FinancialManager
         } catch (error) {
             toast.error("Falha no login: Verifique as suas credenciais.");
         }
@@ -41,6 +43,7 @@ export default function App() {
 
     return (
         <div>
+            {/* Este componente renderiza todas as notificações toast */}
             <Toaster 
                 position="top-center"
                 reverseOrder={false}
@@ -54,6 +57,7 @@ export default function App() {
             />
             
             {user ? (
+                // A prop de notificação foi removida, pois o FinancialManager agora usa o toast diretamente
                 <FinancialManager user={user} onLogout={handleLogout} />
             ) : (
                 <LoginScreen onLogin={handleLogin} />
