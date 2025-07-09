@@ -6,8 +6,12 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
-        // Modificado para não buscar as recorrentes aqui
-        const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", false), orderBy("timestamp", "desc"));
+        
+        // CORREÇÃO: Em vez de procurar por "isRecurring == false",
+        // procuramos por "isRecurring != true". Isso inclui os documentos
+        // onde o campo é 'false' e também os documentos antigos onde o campo nem existe.
+        const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "!=", true), orderBy("isRecurring"), orderBy("timestamp", "desc"));
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
@@ -16,7 +20,6 @@ export function useTransactions(userId) {
     return transactions;
 }
 
-// NOVO HOOK PARA TRANSAÇÕES RECORRENTES
 export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
     useEffect(() => {
@@ -64,4 +67,17 @@ export function useBudgets(userId) {
         return () => unsubscribe();
     }, [userId]);
     return budgets;
+}
+
+export function useGoals(userId) {
+    const [goals, setGoals] = useState([]);
+    useEffect(() => {
+        if (!userId) { setGoals([]); return; }
+        const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsubscribe();
+    }, [userId]);
+    return goals;
 }
