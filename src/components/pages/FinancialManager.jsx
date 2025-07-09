@@ -1,100 +1,100 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useTransactions, useDebts } from '../hooks/dataHooks';
-import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories';
-import { useWindowSize } from '../hooks/useWindowSize';
-import Icon from '../components/ui/Icon';
-import ConfirmationModal from '../components/modals/ConfirmationModal';
-import PaymentModal from '../components/modals/PaymentModal';
-import SummaryCard from '../components/dashboard/SummaryCard';
-import TransactionForm from '../components/transactions/TransactionForm';
-import TransactionItem from '../components/transactions/TransactionItem';
-import DebtForm from '../components/debts/DebtForm';
-import DebtItem from '../components/debts/DebtItem';
-import Reports from './Reports';
-import SettingsPage from './SettingsPage';
-
-// Componente do Gráfico movido para dentro para simplificar as props
-const ExpensePieChart = ({ data }) => {
-    const { width } = useWindowSize();
-    const isMobile = width < 768;
-
-    const chartData = useMemo(() => {
-        const categoryTotals = data.filter(t => t.type === 'expense').reduce((acc, t) => {
-            const category = t.category || 'Sem Categoria';
-            acc[category] = (acc[category] || 0) + t.amount;
-            return acc;
-        }, {});
-        return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }));
-    }, [data]);
-
-    if (chartData.length === 0) {
-        return <div className="text-center text-gray-500 py-10 h-[300px] flex items-center justify-center">Sem dados de despesas para exibir no gráfico.</div>;
-    }
-
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943', '#19D4FF', '#FFD419', '#8884d8', '#82ca9d', '#d88488'];
-
-    return (
-        <ResponsiveContainer width="100%" height={isMobile ? 400 : 300}>
-            <PieChart>
-                <Pie
-                    data={chartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx={isMobile ? "50%" : "40%"}
-                    cy="50%"
-                    innerRadius={isMobile ? 50 : 60}
-                    outerRadius={isMobile ? 70 : 80}
-                    fill="#8884d8"
-                    paddingAngle={5}
-                    labelLine={false}
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                >
-                    {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
-                <Legend
-                    layout={isMobile ? 'horizontal' : 'vertical'}
-                    verticalAlign={isMobile ? 'bottom' : 'middle'}
-                    align={isMobile ? 'center' : 'right'}
-                    wrapperStyle={isMobile ? { paddingTop: '20px' } : {}}
-                    iconType="circle"
-                />
-            </PieChart>
-        </ResponsiveContainer>
-    );
-};
+import { useTransactions, useDebts, useBudgets, useRecurringTransactions, useGoals } from '../hooks/dataHooks.js';
+import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories.js';
+import Icon from '../components/ui/Icon.jsx';
+import ConfirmationModal from '../components/modals/ConfirmationModal.jsx';
+import PaymentModal from '../components/modals/PaymentModal.jsx';
+import ContributeToGoalModal from '../components/modals/ContributeToGoalModal.jsx'; // <-- NOVA IMPORTAÇÃO
+import SummaryCard from '../components/dashboard/SummaryCard.jsx';
+import ExpensePieChart from '../components/dashboard/ExpensePieChart.jsx';
+import BudgetProgress from '../components/dashboard/BudgetProgress.jsx';
+import TransactionForm from '../components/transactions/TransactionForm.jsx';
+import TransactionItem from '../components/transactions/TransactionItem.jsx';
+import RecurringTransactionItem from '../components/transactions/RecurringTransactionItem.jsx';
+import DebtForm from '../components/debts/DebtForm.jsx';
+import DebtItem from '../components/debts/DebtItem.jsx';
+import GoalForm from '../components/goals/GoalForm.jsx';
+import GoalItem from '../components/goals/GoalItem.jsx';
+import Reports from './Reports.jsx';
+import SettingsPage from './SettingsPage.jsx';
 
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
+    const recurringTransactions = useRecurringTransactions(user.uid);
     const debts = useDebts(user.uid);
     const expenseCategories = useExpenseCategories(user.uid);
     const incomeCategories = useIncomeCategories(user.uid);
+    const budgets = useBudgets(user.uid);
+    const goals = useGoals(user.uid);
+    
     const [transactionToEdit, setTransactionToEdit] = useState(null);
     const [itemToDelete, setItemToDelete] = useState({ id: null, type: null, data: null });
     const [filterPeriod, setFilterPeriod] = useState('month');
     const [debtToPay, setDebtToPay] = useState(null);
     const [view, setView] = useState('dashboard');
+    const [goalToContribute, setGoalToContribute] = useState(null);
 
     const handleAddCategory = async (collectionName, categoryName) => { if (!categoryName) return; try { await addDoc(collection(db, `users/${user.uid}/${collectionName}`), { name: categoryName }); } catch (e) { console.error("Erro ao adicionar categoria:", e); setAlertMessage("Ocorreu um erro ao adicionar a categoria."); } };
     const handleDeleteCategory = async (collectionName, categoryId) => { if (!categoryId) return; try { await deleteDoc(doc(db, `users/${user.uid}/${collectionName}`, categoryId)); } catch (e) { console.error("Erro ao apagar categoria:", e); setAlertMessage("Ocorreu um erro ao apagar a categoria."); } };
-    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if (data.linkedDebtId) { setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova."); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage("Ocorreu um erro ao guardar a transação."); } };
+    const handleSaveBudget = async (budgetData) => { const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0'); const currentYear = new Date().getFullYear(); const budgetId = `${budgetData.categoryName.replace(/\s+/g, '-')}-${currentYear}-${currentMonth}`; try { const budgetRef = doc(db, `users/${user.uid}/budgets`, budgetId); await setDoc(budgetRef, { ...budgetData, month: `${currentYear}-${currentMonth}` }, { merge: true }); setAlertMessage("Orçamento salvo com sucesso!"); } catch (e) { console.error("Erro ao salvar orçamento:", e); setAlertMessage("Ocorreu um erro ao salvar o orçamento."); } };
+    const handleDeleteBudget = async (budgetId) => { if (!budgetId) return; try { await deleteDoc(doc(db, `users/${user.uid}/budgets`, budgetId)); } catch (e) { console.error("Erro ao apagar orçamento:", e); setAlertMessage("Ocorreu um erro ao apagar o orçamento."); } };
     const handleSaveDebt = async (data) => { try { await addDoc(collection(db, `users/${user.uid}/debts`), data); } catch (e) { console.error("Erro ao guardar dívida:", e); setAlertMessage("Ocorreu um erro ao guardar a dívida."); } };
-    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({ id, type, data });
-    const handleDelete = async () => { if (!itemToDelete.id) return; const { id, type, data } = itemToDelete; const batch = writeBatch(db); const path = `users/${user.uid}/${type}s`; const docRef = doc(db, path, id); try { if (type === 'transaction' && data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - data.amount; batch.update(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setAlertMessage("Não é possível apagar uma dívida com pagamentos registados. Apague primeiro os pagamentos."); setItemToDelete({ id: null, type: null, data: null }); return; } } batch.delete(docRef); await batch.commit(); } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage("Ocorreu um erro ao apagar."); } finally { setItemToDelete({ id: null, type: null, data: null }); } };
+    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
+    const handleDelete = async () => { if (!itemToDelete.id) return; const { id, type, data } = itemToDelete; const batch = writeBatch(db); const path = `users/${user.uid}/${type}s`; const docRef = doc(db, path, id); try { if (type === 'transaction' && data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - data.amount; batch.update(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setAlertMessage("Não é possível apagar uma dívida com pagamentos registados. Apague primeiro os pagamentos."); setItemToDelete({id: null, type: null, data: null}); return; } } batch.delete(docRef); await batch.commit(); } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage("Ocorreu um erro ao apagar."); } finally { setItemToDelete({id: null, type: null, data: null}); } };
     const handleMakePayment = async (paymentAmount) => { if (!debtToPay || !paymentAmount || paymentAmount <= 0) return; const batch = writeBatch(db); const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, { description: `Pagamento: ${debtToPay.description}`.toUpperCase(), amount: paymentAmount, type: 'expense', category: 'Pagamento de Dívida', timestamp: Timestamp.now(), linkedDebtId: debtToPay.id }); const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id); const newPaidAmount = debtToPay.paidAmount + paymentAmount; const newStatus = newPaidAmount >= debtToPay.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); try { await batch.commit(); setDebtToPay(null); } catch (e) { console.error("Erro ao processar pagamento:", e); setAlertMessage("Ocorreu um erro ao processar o pagamento."); } };
+    const handleLaunchRecurring = async (recurringTransaction) => { const newTransaction = { ...recurringTransaction, isRecurring: false, timestamp: Timestamp.now(), recurringId: recurringTransaction.id }; delete newTransaction.id; try { await addDoc(collection(db, `users/${user.uid}/transactions`), newTransaction); setAlertMessage(`'${newTransaction.description}' foi lançada com sucesso!`); } catch (e) { console.error("Erro ao lançar transação recorrente:", e); setAlertMessage("Ocorreu um erro ao lançar a transação."); } };
+    const handleSaveGoal = async (goalData) => { try { await addDoc(collection(db, `users/${user.uid}/goals`), goalData); setAlertMessage("Meta salva com sucesso!"); } catch (e) { console.error("Erro ao salvar meta:", e); setAlertMessage("Ocorreu um erro ao salvar a meta."); } };
+    const handleDeleteGoal = async (goalId) => { if (!goalId) return; try { await deleteDoc(doc(db, `users/${user.uid}/goals`, goalId)); } catch (e) { console.error("Erro ao apagar meta:", e); setAlertMessage("Ocorreu um erro ao apagar a meta."); } };
     
-    const filteredTransactions = useMemo(() => { if (filterPeriod === 'month') { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
+    // NOVA FUNÇÃO PARA CONTRIBUIR PARA UMA META
+    const handleContributeToGoal = async (goal, amount) => {
+        if (!goal || !amount || amount <= 0) return;
+
+        const batch = writeBatch(db);
+
+        // 1. Criar a transação de despesa
+        const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        batch.set(newTransactionRef, {
+            description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(),
+            amount: amount,
+            type: 'expense',
+            category: 'Poupança',
+            timestamp: Timestamp.now(),
+            isRecurring: false
+        });
+
+        // 2. Atualizar o valor atual da meta
+        const goalRef = doc(db, `users/${user.uid}/goals`, goal.id);
+        const newCurrentAmount = goal.currentAmount + amount;
+        batch.update(goalRef, { currentAmount: newCurrentAmount });
+
+        try {
+            await batch.commit();
+            setGoalToContribute(null);
+            setAlertMessage("Contribuição registada com sucesso!");
+        } catch (e) {
+            console.error("Erro ao contribuir para a meta:", e);
+            setAlertMessage("Ocorreu um erro ao registar a contribuição.");
+        }
+    };
+
+    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId) { setAlertMessage("Não é possível editar uma transação de pagamento. Apague-a e crie uma nova."); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage("Ocorreu um erro ao guardar a transação."); } };
+
+    const filteredTransactions = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (filterPeriod === 'month') { return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
     const { totalIncome, totalExpenses, balance } = useMemo(() => { const income = filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0); const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0); return { totalIncome: income, totalExpenses: expenses, balance: income - expenses }; }, [filteredTransactions]);
     const activeDebts = useMemo(() => debts.filter(d => d.status === 'active'), [debts]);
     const totalActiveDebt = useMemo(() => activeDebts.reduce((acc, d) => acc + (d.totalAmount - d.paidAmount), 0), [activeDebts]);
+    const budgetsWithSpending = useMemo(() => { return budgets.map(budget => { const spent = filteredTransactions.filter(t => t.type === 'expense' && t.category === budget.categoryName).reduce((acc, t) => acc + t.amount, 0); return { ...budget, spent }; }); }, [budgets, filteredTransactions]);
+    const launchedThisMonth = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); const launchedIds = new Set(); transactions.forEach(t => { if (t.recurringId && t.timestamp.toDate() >= startOfMonth) { launchedIds.add(t.recurringId); } }); return launchedIds; }, [transactions]);
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
             <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({ id: null, type: null, data: null })} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
             <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
+            <ContributeToGoalModal isOpen={!!goalToContribute} onClose={() => setGoalToContribute(null)} onConfirm={handleContributeToGoal} goal={goalToContribute} />
+            
             <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-3">
@@ -112,50 +112,7 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                 </div>
             </header>
             
-            {view === 'dashboard' && (
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <SummaryCard title="Receitas (Mês)" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" />
-                        <SummaryCard title="Despesas (Mês)" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" />
-                        <SummaryCard title="Saldo (Mês)" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" />
-                        <SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" />
-                    </section>
-                    
-                    <div className="bg-white p-6 rounded-2xl shadow-md mb-8">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-4">Distribuição de Despesas (Mês)</h2>
-                        <ExpensePieChart data={filteredTransactions} />
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-                        <div className="lg:col-span-2">
-                            <TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} expenseCategories={expenseCategories} incomeCategories={incomeCategories}/>
-                        </div>
-                        <div className="lg:col-span-3">
-                            <div className="bg-white p-6 rounded-2xl shadow-md h-full">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold text-gray-800">Histórico de Transações</h2>
-                                    <div className="flex bg-gray-100 rounded-full p-1 shadow-sm border">
-                                        <button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button>
-                                        <button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Tudo</button>
-                                    </div>
-                                </div>
-                                {transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg h-full flex flex-col justify-center"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação encontrada.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}
-                            </div>
-                        </div>
-                    </div>
-                    <hr className="my-8" />
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                            <div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div>
-                            <div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div>
-                        </div>
-                    </div>
-                </main>
-            )}
-            {view === 'reports' && <Reports transactions={transactions} />}
-            {view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />}
-        </div>
+            {view === 'dashboard' && ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><SummaryCard title="Receitas (Mês)" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" /><SummaryCard title="Despesas (Mês)" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" /><SummaryCard title="Saldo (Mês)" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" /><SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" /></section>{recurringTransactions.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Lançamentos Recorrentes</h2> <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {recurringTransactions.map(item => ( <RecurringTransactionItem key={item.id} transaction={item} onLaunch={handleLaunchRecurring} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} hasBeenLaunched={launchedThisMonth.has(item.id)} /> ))} </div> </div> )}{budgetsWithSpending.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Acompanhamento de Orçamentos</h2> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {budgetsWithSpending.map(item => ( <BudgetProgress key={item.id} budget={item} currentSpending={item.spent} /> ))} </div> </div> )}<div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-2xl font-bold text-gray-800 mb-4">Distribuição de Despesas (Mês)</h2><ExpensePieChart data={filteredTransactions} /></div><div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8"><div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} expenseCategories={expenseCategories} incomeCategories={incomeCategories}/></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md h-full"><div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Histórico de Transações</h2><div className="flex bg-gray-100 rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Tudo</button></div></div>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg h-full flex flex-col justify-center"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação encontrada.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Metas de Poupança</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><GoalForm onSave={handleSaveGoal} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{goals.length === 0 ? <div className="text-center py-8"><Icon name="flag" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma meta criada.</p><p className="text-sm text-gray-400">Crie sua primeira meta para começar a poupar!</p></div> : <ul className="space-y-3">{goals.map(g => <GoalItem key={g.id} goal={g} onContribute={setGoalToContribute} onDelete={() => handleDeleteGoal(g.id)} />)}</ul>}</div></div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div></div></div></main> )}{view === 'reports' && <Reports transactions={transactions} />}{view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} budgets={budgets} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} />}</div>
     );
 };
 
