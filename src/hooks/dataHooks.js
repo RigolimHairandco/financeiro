@@ -6,10 +6,12 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
+        
         const q = query(
             collection(db, `users/${userId}/transactions`), 
             where("isRecurring", "!=", true) 
         );
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
@@ -76,6 +78,7 @@ export function useBudgets(userId) {
     return budgets;
 }
 
+// A FUNÇÃO QUE FALTAVA SER EXPORTADA
 export function useGoals(userId) {
     const [goals, setGoals] = useState([]);
     useEffect(() => {
