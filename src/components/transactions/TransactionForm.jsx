@@ -10,6 +10,7 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
     const [incomeSource, setIncomeSource] = useState(incomeCategories?.[0]?.name || '');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [linkedDebtId, setLinkedDebtId] = useState('');
+    const [isRecurring, setIsRecurring] = useState(false); // <-- NOVO ESTADO PARA A CHECKBOX
     const isEditing = !!transactionToEdit;
 
     useEffect(() => {
@@ -21,6 +22,7 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
             if (transactionToEdit.type === 'expense') setCategory(transactionToEdit.category);
             else setIncomeSource(transactionToEdit.incomeSource);
             setLinkedDebtId(transactionToEdit.linkedDebtId || '');
+            setIsRecurring(transactionToEdit.isRecurring || false); // <-- ATUALIZA AO EDITAR
         }
     }, [transactionToEdit, isEditing]);
     
@@ -45,6 +47,7 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
         setCategory(expenseCategories?.[0]?.name || '');
         setIncomeSource(incomeCategories?.[0]?.name || '');
         setType('expense');
+        setIsRecurring(false); // <-- RESETA A CHECKBOX
     };
 
     const handleSubmit = async (e) => {
@@ -55,6 +58,7 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
             amount: parseFloat(amount),
             type,
             timestamp: Timestamp.fromDate(new Date(date + 'T00:00:00')),
+            isRecurring: isRecurring, // <-- SALVA O NOVO DADO
             ...(type === 'expense' && { category }),
             ...(type === 'income' && { incomeSource }),
             ...(category === 'Pagamento de Dívida' && { category: 'Pagamento de Dívida' }),
@@ -125,6 +129,24 @@ const TransactionForm = ({ onSave, transactionToEdit, setTransactionToEdit, acti
                         </>
                     )}
                 </div>
+                
+                {/* --- NOVA CHECKBOX ADICIONADA AQUI --- */}
+                {!isEditing && (
+                    <div className="flex items-center pt-2">
+                        <input
+                            id="isRecurring"
+                            type="checkbox"
+                            checked={isRecurring}
+                            onChange={(e) => setIsRecurring(e.target.checked)}
+                            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <label htmlFor="isRecurring" className="ml-2 block text-sm text-gray-900">
+                            Marcar como transação recorrente (ex: Aluguer, Salário)
+                        </label>
+                    </div>
+                )}
+                {/* --- FIM DA CHECKBOX --- */}
+
                 <div className="flex items-center gap-4 pt-2">
                     <button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">{isEditing ? 'Guardar Alterações' : 'Adicionar'}</button>
                     {isEditing && (<button type="button" onClick={resetForm} className="w-full py-3 px-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300">Cancelar</button>)}
