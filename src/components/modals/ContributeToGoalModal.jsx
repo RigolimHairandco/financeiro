@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Icon from '../ui/Icon.jsx';
 
 const ContributeToGoalModal = ({ isOpen, onClose, onConfirm, goal }) => {
     const [amount, setAmount] = useState('');
@@ -14,9 +15,14 @@ const ContributeToGoalModal = ({ isOpen, onClose, onConfirm, goal }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
             <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full">
-                <h3 className="text-lg font-bold mb-2">Contribuir para Meta</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold">Contribuir para Meta</h3>
+                    <button onClick={onClose} className="p-1">
+                        <Icon name="x" className="text-gray-500 hover:text-gray-800" />
+                    </button>
+                </div>
                 <p className="text-sm text-gray-600 mb-4">Meta: <span className="font-semibold">{goal.name}</span></p>
-                <label htmlFor="contribution-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor da Contribuição</label>
+                <label htmlFor="contribution-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor da Contribuição (R$)</label>
                 <input
                     id="contribution-amount"
                     type="number"
