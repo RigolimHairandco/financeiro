@@ -26,7 +26,7 @@ export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
     useEffect(() => {
         if (!userId) { setRecurring([]); return; }
-        const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
+        const q = query(collection(db, `users/${user.uid}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
@@ -52,7 +52,6 @@ export function useDebts(userId) {
     return debts;
 }
 
-// NOVO HOOK ADICIONADO AQUI
 export function useBudgets(userId) {
     const [budgets, setBudgets] = useState([]);
     useEffect(() => {
@@ -75,4 +74,20 @@ export function useBudgets(userId) {
         return () => unsubscribe();
     }, [userId]);
     return budgets;
+}
+
+// ADICIONADO: A função que faltava
+export function useGoals(userId) {
+    const [goals, setGoals] = useState([]);
+    useEffect(() => {
+        if (!userId) { setGoals([]); return; }
+        const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Erro no listener de metas: ", error);
+        });
+        return () => unsubscribe();
+    }, [userId]);
+    return goals;
 }
