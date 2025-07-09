@@ -1,30 +1,30 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { Toaster, toast } from 'react-hot-toast';
 import { auth } from './firebase';
 import { useAuth } from './hooks/useAuth';
-import AlertModal from './components/modals/AlertModal.jsx'; // Caminho corrigido
 import LoginScreen from './pages/LoginScreen.jsx';
 import FinancialManager from './pages/FinancialManager.jsx';
 import Icon from './components/ui/Icon.jsx';
 
 export default function App() {
     const { user, loading } = useAuth();
-    const [alertMessage, setAlertMessage] = useState(null); // Corrigido para null para consistência
 
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            toast.success("Login efetuado com sucesso!");
         } catch (error) {
-            setAlertMessage({ message: "Falha no login: Verifique as suas credenciais.", type: 'error' });
+            toast.error("Falha no login: Verifique as suas credenciais.");
         }
     };
 
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            setAlertMessage({ message: "Sessão terminada com sucesso!", type: 'success' });
+            toast.success("Sessão terminada com sucesso!");
         } catch (error) {
-            setAlertMessage({ message: "Erro ao fazer logout.", type: 'error' });
+            toast.error("Erro ao fazer logout.");
         }
     };
 
@@ -41,11 +41,20 @@ export default function App() {
 
     return (
         <div>
-            {/* A prop foi corrigida para 'notification' para corresponder ao novo componente */}
-            <AlertModal notification={alertMessage} onClear={() => setAlertMessage(null)} />
+            <Toaster 
+                position="top-center"
+                reverseOrder={false}
+                toastOptions={{
+                    duration: 3000,
+                    style: {
+                        background: '#363636',
+                        color: '#fff',
+                    },
+                }}
+            />
             
             {user ? (
-                <FinancialManager user={user} onLogout={handleLogout} setNotification={setAlertMessage} />
+                <FinancialManager user={user} onLogout={handleLogout} />
             ) : (
                 <LoginScreen onLogin={handleLogin} />
             )}
