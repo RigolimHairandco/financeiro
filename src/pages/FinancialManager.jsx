@@ -11,9 +11,9 @@ import TransactionForm from '../components/transactions/TransactionForm.jsx';
 import TransactionItem from '../components/transactions/TransactionItem.jsx';
 import DebtForm from '../components/debts/DebtForm.jsx';
 import DebtItem from '../components/debts/DebtItem.jsx';
-import ExpensePieChart from '../components/dashboard/ExpensePieChart.jsx';
 import Reports from './Reports.jsx';
 import SettingsPage from './SettingsPage.jsx';
+import ExpensePieChart from '../components/dashboard/ExpensePieChart.jsx';
 
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
@@ -105,5 +105,5 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
            </div>
        );
    };
-
+   
    export default FinancialManager;
