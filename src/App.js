@@ -2,18 +2,19 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAuth } from './hooks/useAuth';
-import Notification from './components/modals/Notification.jsx';
+import Notification from './components/modals/Notification.jsx'; // <-- MUDOU
 import LoginScreen from './pages/LoginScreen.jsx';
 import FinancialManager from './pages/FinancialManager.jsx';
 import Icon from './components/ui/Icon.jsx';
 
 export default function App() {
     const { user, loading } = useAuth();
-    const [notification, setNotification] = useState(null);
+    const [notification, setNotification] = useState(null); // <-- MUDOU
 
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
+            // A notificação de sucesso será chamada de dentro do FinancialManager
         } catch (error) {
             setNotification({ message: "Falha no login: Verifique as suas credenciais.", type: 'error' });
         }
@@ -41,10 +42,11 @@ export default function App() {
 
     return (
         <div>
+            {/* O novo componente de notificação */}
             <Notification notification={notification} onClear={() => setNotification(null)} />
             
             {user ? (
-                <FinancialManager user={user} onLogout={handleLogout} setAlertMessage={setNotification} />
+                <FinancialManager user={user} onLogout={handleLogout} setNotification={setNotification} />
             ) : (
                 <LoginScreen onLogin={handleLogin} />
             )}
