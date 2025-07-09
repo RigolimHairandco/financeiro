@@ -7,13 +7,18 @@ export function useTransactions(userId) {
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
         
-        // CORREÇÃO: Em vez de procurar por "isRecurring == false",
-        // procuramos por "isRecurring != true". Isso inclui os documentos
-        // onde o campo é 'false' e também os documentos antigos onde o campo nem existe.
-        const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "!=", true), orderBy("isRecurring"), orderBy("timestamp", "desc"));
+        // CORREÇÃO APLICADA AQUI:
+        // Em vez de "==", usamos "!=" para incluir transações antigas.
+        const q = query(
+            collection(db, `users/${userId}/transactions`), 
+            where("isRecurring", "!=", true) 
+        );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Ordenamos por data aqui no código para evitar problemas com índices do Firestore
+            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
+            setTransactions(fetchedTransactions);
         });
         return () => unsubscribe();
     }, [userId]);
