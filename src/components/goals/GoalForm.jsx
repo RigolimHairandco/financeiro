@@ -48,4 +48,4 @@ const GoalForm = ({ onSave }) => {
     );
 };
 
-export default GoalForm; // <-- ADICIONE ESTA LINHA
+export default GoalForm;
