@@ -15,7 +15,6 @@ export default function App() {
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (error) {
-            // Usando o novo sistema de notificação
             setAlertMessage({ message: "Falha no login: Verifique as suas credenciais.", type: 'error' });
         }
     };
@@ -23,7 +22,6 @@ export default function App() {
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            // Usando o novo sistema de notificação
             setAlertMessage({ message: "Sessão terminada com sucesso!", type: 'success' });
         } catch (error) {
             setAlertMessage({ message: "Erro ao fazer logout.", type: 'error' });
@@ -43,7 +41,7 @@ export default function App() {
 
     return (
         <div>
-            {/* Passando a prop correta para o novo componente de Notificação */}
+            {/* A prop foi corrigida para 'notification' para corresponder ao novo componente */}
             <AlertModal notification={alertMessage} onClear={() => setAlertMessage(null)} />
             
             {user ? (
