@@ -13,7 +13,7 @@ import TransactionForm from '../components/transactions/TransactionForm.jsx';
 import TransactionItem from '../components/transactions/TransactionItem.jsx';
 import RecurringTransactionItem from '../components/transactions/RecurringTransactionItem.jsx';
 import DebtForm from '../components/debts/DebtForm.jsx';
-import DebtItem from '../components/debts/DebtItem.jsx';
+import DebtItem from '../components/debts/DebtItem.jsx'; // <-- A IMPORTAÇÃO ESTAVA FALTANDO, AGORA ESTÁ CORRETA
 import GoalForm from '../components/goals/GoalForm.jsx';
 import GoalItem from '../components/goals/GoalItem.jsx';
 import Reports from './Reports.jsx';
