@@ -2,16 +2,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '../components/ui/Icon.jsx';
 import CategoryIcon from '../components/ui/CategoryIcon.jsx';
 
-const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onSaveBudget, onDeleteBudget, budgets = [] }) => {
+const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onSaveBudget, onDeleteBudget, budgets = [], onUpdatePassword }) => {
     const [newExpenseCat, setNewExpenseCat] = useState('');
     const [newIncomeCat, setNewIncomeCat] = useState('');
     
     const [budgetCategory, setBudgetCategory] = useState(expenseCategories[0]?.name || '');
     const [budgetAmount, setBudgetAmount] = useState('');
 
-    // CORREÇÃO: As listas de sugestões foram adicionadas aqui
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Poupança', 'Outros'];
-    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
+    // Estados para o novo formulário de senha
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
 
     useEffect(() => {
         if (expenseCategories.length > 0 && !budgetCategory) {
@@ -34,6 +34,21 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
         });
         setBudgetAmount('');
     };
+
+    const handlePasswordSubmit = (e) => {
+        e.preventDefault();
+        if (newPassword.length < 6) {
+            alert("A nova senha deve ter pelo menos 6 caracteres.");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            alert("As senhas não coincidem.");
+            return;
+        }
+        onUpdatePassword(newPassword);
+        setNewPassword('');
+        setConfirmPassword('');
+    };
     
     const userExpenseNames = useMemo(() => expenseCategories.map(c => c.name), [expenseCategories]);
     const userIncomeNames = useMemo(() => incomeCategories.map(c => c.name), [incomeCategories]);
@@ -43,6 +58,23 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <button onClick={() => setView('dashboard')} className="mb-6 inline-flex items-center gap-2 py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"><Icon name="arrowleft" size={18} /> Voltar</button>
             
+            <div className="mb-12">
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Alterar Senha</h1>
+                <div className="bg-white p-6 rounded-2xl shadow-md mt-8">
+                    <form onSubmit={handlePasswordSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label htmlFor="new-password" className="block text-sm font-medium text-gray-600 mb-1">Nova Senha</label>
+                            <input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
+                        </div>
+                        <div>
+                            <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-600 mb-1">Confirmar Nova Senha</label>
+                            <input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
+                        </div>
+                        <button type="submit" className="w-full py-3 px-4 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700">Atualizar Senha</button>
+                    </form>
+                </div>
+            </div>
+
             <div className="mb-12">
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">Gerir Orçamentos</h1>
                 <p className="text-gray-600 mb-8">Defina seus orçamentos mensais por categoria de despesa.</p>
