@@ -5,25 +5,39 @@ import { db } from '../firebase';
 export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
-        if (!userId) { setTransactions([]); return; }
+        if (!userId) { 
+            console.log("HOOK 'useTransactions': userId não fornecido, retornando vazio.");
+            setTransactions([]); 
+            return; 
+        }
         
-        // CORREÇÃO APLICADA AQUI:
-        // Em vez de "==", usamos "!=" para incluir transações antigas.
+        console.log("HOOK 'useTransactions': A iniciar busca para o userId:", userId);
+        
         const q = query(
-            collection(db, `users/${userId}/transactions`), 
-            where("isRecurring", "!=", true) 
+            collection(db, `users/${userId}/transactions`)
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Ordenamos por data aqui no código para evitar problemas com índices do Firestore
-            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
-            setTransactions(fetchedTransactions);
+            console.log(`HOOK 'useTransactions': Recebeu uma resposta. Número de documentos: ${snapshot.size}`);
+            
+            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            const normalTransactions = allTransactions.filter(t => t.isRecurring !== true);
+            console.log(`HOOK 'useTransactions': Encontradas ${normalTransactions.length} transações normais.`);
+
+            setTransactions(normalTransactions);
+
+        }, (error) => {
+            // ESTA É A PARTE MAIS IMPORTANTE
+            console.error("!!!!!!!!!! ERRO NO LISTENER DE TRANSAÇÕES !!!!!!!!!!", error);
         });
+
         return () => unsubscribe();
     }, [userId]);
     return transactions;
 }
+
+// Os outros hooks permanecem iguais, mas com logs de erro também.
 
 export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
@@ -32,6 +46,8 @@ export function useRecurringTransactions(userId) {
         const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("!!!!!!!!!! ERRO NO LISTENER DE TRANSAÇÕES RECORRENTES !!!!!!!!!!", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -45,6 +61,8 @@ export function useDebts(userId) {
         const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("!!!!!!!!!! ERRO NO LISTENER DE DÍVIDAS !!!!!!!!!!", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -62,11 +80,12 @@ export function useBudgets(userId) {
         const currentYear = new Date().getFullYear();
         const monthYear = `${currentYear}-${currentMonth}`;
 
-        const q = query(collection(db, `users/${userId}/budgets`));
+        const q = query(collection(db, `users/${userId}/budgets`), where("month", "==", monthYear));
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userBudgets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setBudgets(userBudgets.filter(b => b.month === monthYear));
+            setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("!!!!!!!!!! ERRO NO LISTENER DE ORÇAMENTOS !!!!!!!!!!", error);
         });
         
         return () => unsubscribe();
@@ -81,6 +100,8 @@ export function useGoals(userId) {
         const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("!!!!!!!!!! ERRO NO LISTENER DE METAS !!!!!!!!!!", error);
         });
         return () => unsubscribe();
     }, [userId]);
