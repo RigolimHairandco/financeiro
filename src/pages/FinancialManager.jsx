@@ -43,12 +43,69 @@ const FinancialManager = ({ user, onLogout, setNotification }) => {
     const handleSaveDebt = async (data) => { try { await addDoc(collection(db, `users/${user.uid}/debts`), data); setNotification({message: 'Dívida adicionada!', type: 'success'}); } catch (e) { console.error("Erro ao guardar dívida:", e); setNotification({message: "Ocorreu um erro ao guardar a dívida.", type: 'error'}); } };
     const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
     const handleDelete = async () => { if (!itemToDelete.id || !itemToDelete.type) return; const { id, type } = itemToDelete; const collectionName = `${type}s`; const docRef = doc(db, `users/${user.uid}/${collectionName}`, id); try { if (type === 'transaction' && itemToDelete.data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, itemToDelete.data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - itemToDelete.data.amount; await updateDoc(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setNotification({message: "Apague primeiro os pagamentos associados a esta dívida.", type: 'error'}); setItemToDelete({id: null, type: null, data: null}); return; } } await deleteDoc(docRef); setNotification({message: "Item apagado com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao apagar item:", e); setNotification({message: "Ocorreu um erro ao apagar.", type: 'error'}); } finally { setItemToDelete({id: null, type: null, data: null}); } };
-    const handleMakePayment = async (paymentAmount) => { if (!debtToPay || !paymentAmount || paymentAmount <= 0) return; const batch = writeBatch(db); const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, { description: `PAGAMENTO: ${debtToPay.description}`.toUpperCase(), amount: paymentAmount, type: 'expense', category: 'Pagamento de Dívida', timestamp: Timestamp.now(), isRecurring: false, linkedDebtId: debtToPay.id }); const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id); const newPaidAmount = debtToPay.paidAmount + paymentAmount; const newStatus = newPaidAmount >= debtToPay.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); try { await batch.commit(); setDebtToPay(null); setNotification({message: "Pagamento registado!", type: 'success'}); } catch (e) { console.error("Erro ao processar pagamento:", e); setNotification({message: "Ocorreu um erro ao processar o pagamento.", type: 'error'}); } };
+    
+    // CORREÇÃO APLICADA AQUI
+    const handleMakePayment = async (paymentAmount) => {
+        if (!debtToPay || !paymentAmount || paymentAmount <= 0) return;
+        const batch = writeBatch(db);
+        const newTransRef = doc(collection(db, `users/${user.uid}/transactions`));
+        // Cria a transação de despesa
+        batch.set(newTransRef, { 
+            description: `PAGAMENTO: ${debtToPay.description}`.toUpperCase(), 
+            amount: paymentAmount, 
+            type: 'expense', 
+            category: 'Pagamento de Dívida', 
+            timestamp: Timestamp.now(), 
+            isRecurring: false, 
+            linkedDebtId: debtToPay.id 
+        });
+        const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id);
+        const newPaidAmount = debtToPay.paidAmount + paymentAmount;
+        const newStatus = newPaidAmount >= debtToPay.totalAmount ? 'paid' : 'active';
+        batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus });
+        try { 
+            await batch.commit(); 
+            setDebtToPay(null); 
+            setNotification({message: "Pagamento registado com sucesso!", type: 'success'}); 
+        } catch (e) { 
+            console.error("Erro ao processar pagamento:", e); 
+            setNotification({message: "Ocorreu um erro ao processar o pagamento.", type: 'error'}); 
+        } 
+    };
+
     const handleLaunchRecurring = async (recurringTransaction) => { const newTransaction = { ...recurringTransaction, isRecurring: false, timestamp: Timestamp.now(), recurringId: recurringTransaction.id }; delete newTransaction.id; try { await addDoc(collection(db, `users/${user.uid}/transactions`), newTransaction); setNotification({message: `'${newTransaction.description}' foi lançada com sucesso!`, type: 'success'}); } catch (e) { console.error("Erro ao lançar transação recorrente:", e); setNotification({message: "Ocorreu um erro ao lançar a transação.", type: 'error'}); } };
     const handleSaveGoal = async (goalData) => { try { await addDoc(collection(db, `users/${user.uid}/goals`), goalData); setNotification({message: "Meta salva com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao salvar meta:", e); setNotification({message: "Ocorreu um erro ao salvar a meta.", type: 'error'}); } };
     const handleDeleteGoal = async (goalId) => { if (!goalId) return; try { await deleteDoc(doc(db, `users/${user.uid}/goals`, goalId)); setNotification({message: "Meta apagada!", type: 'success'}); } catch (e) { console.error("Erro ao apagar meta:", e); setNotification({message: "Ocorreu um erro ao apagar a meta.", type: 'error'}); } };
-    const handleContributeToGoal = async (goal, amount) => { if (!goal || !amount || amount <= 0) return; const batch = writeBatch(db); const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransactionRef, { description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(), amount: amount, type: 'expense', category: 'Poupança', timestamp: Timestamp.now(), isRecurring: false }); const goalRef = doc(db, `users/${user.uid}/goals`, goal.id); const newCurrentAmount = goal.currentAmount + amount; batch.update(goalRef, { currentAmount: newCurrentAmount }); try { await batch.commit(); setGoalToContribute(null); setNotification({message: "Contribuição registada com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao contribuir para a meta:", e); setNotification({message: "Ocorreu um erro ao registar a contribuição.", type: 'error'}); } };
-    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId) { setNotification({message: "Não é possível editar uma transação de pagamento.", type: 'error'}); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); setNotification({message: "Transação atualizada!", type: 'success'}); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } setNotification({message: "Transação adicionada!", type: 'success'}); } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setNotification({message: "Ocorreu um erro ao guardar a transação.", type: 'error'}); } };
+    
+    // CORREÇÃO APLICADA AQUI
+    const handleContributeToGoal = async (goal, amount) => {
+        if (!goal || !amount || amount <= 0) return;
+        const batch = writeBatch(db);
+        const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`));
+        // Cria a transação de despesa para a poupança
+        batch.set(newTransactionRef, { 
+            description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(), 
+            amount: amount, 
+            type: 'expense', 
+            category: 'Poupança', 
+            timestamp: Timestamp.now(), 
+            isRecurring: false,
+            linkedGoalId: goal.id
+        });
+        const goalRef = doc(db, `users/${user.uid}/goals`, goal.id);
+        const newCurrentAmount = goal.currentAmount + amount;
+        batch.update(goalRef, { currentAmount: newCurrentAmount });
+        try { 
+            await batch.commit(); 
+            setGoalToContribute(null); 
+            setNotification({message: "Contribuição registada com sucesso!", type: 'success'}); 
+        } catch (e) { 
+            console.error("Erro ao contribuir para a meta:", e); 
+            setNotification({message: "Ocorreu um erro ao registar a contribuição.", type: 'error'}); 
+        } 
+    };
+    
+    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId || data.linkedGoalId) { setNotification({message: "Não é possível editar uma transação de pagamento ou contribuição.", type: 'error'}); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); setNotification({message: "Transação atualizada!", type: 'success'}); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } setNotification({message: "Transação adicionada!", type: 'success'}); } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setNotification({message: "Ocorreu um erro ao guardar a transação.", type: 'error'}); } };
     
     const filteredTransactions = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (filterPeriod === 'month') { return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
     const { totalIncome, totalExpenses, balance } = useMemo(() => { const income = filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0); const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0); return { totalIncome: income, totalExpenses: expenses, balance: income - expenses }; }, [filteredTransactions]);
@@ -73,4 +130,4 @@ const FinancialManager = ({ user, onLogout, setNotification }) => {
        );
 };
 
-export default FinancialManager; // <-- A LINHA QUE FALTAVA
+export default FinancialManager;
