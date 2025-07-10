@@ -6,16 +6,22 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
+        
+        // CORREÇÃO FINAL: Esta consulta é a mais eficiente e a que o Firebase
+        // consegue otimizar com um índice simples.
         const q = query(
             collection(db, `users/${userId}/transactions`), 
-            where("isRecurring", "!=", true) 
+            where("isRecurring", "==", false),
+            orderBy("timestamp", "desc")
         );
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
             setTransactions(fetchedTransactions);
         }, (error) => {
             console.error("Erro no listener de transações: ", error);
+            // ESTA MENSAGEM DE ERRO É A NOSSA SOLUÇÃO
+            console.error("SE APARECER UM LINK PARA CRIAR ÍNDICE, CLIQUE NELE!", error.message);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -55,33 +61,25 @@ export function useDebts(userId) {
 export function useBudgets(userId) {
     const [budgets, setBudgets] = useState([]);
     useEffect(() => {
-        if (!userId) {
-            setBudgets([]);
-            return;
-        }
+        if (!userId) { setBudgets([]); return; }
         const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
         const currentYear = new Date().getFullYear();
         const monthYear = `${currentYear}-${currentMonth}`;
-
         const q = query(collection(db, `users/${userId}/budgets`), where("month", "==", monthYear));
-        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
             console.error("Erro no listener de orçamentos: ", error);
         });
-        
         return () => unsubscribe();
     }, [userId]);
     return budgets;
 }
 
-// CORREÇÃO: A variável 'userId' foi adicionada como parâmetro aqui
 export function useGoals(userId) {
     const [goals, setGoals] = useState([]);
     useEffect(() => {
         if (!userId) { setGoals([]); return; }
-        // E usada aqui para montar o caminho correto
         const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
