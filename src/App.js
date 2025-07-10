@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAuth } from './hooks/useAuth';
+import Notification from './components/modals/Notification.jsx';
 import LoginScreen from './pages/LoginScreen.jsx';
 import FinancialManager from './pages/FinancialManager.jsx';
 import Icon from './components/ui/Icon.jsx';
-import Notification from './components/modals/Notification.jsx';
 
 export default function App() {
     const { user, loading } = useAuth();
