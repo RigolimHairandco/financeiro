@@ -6,13 +6,15 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
+        // Consulta para transações normais, ordenadas por data
         const q = query(
             collection(db, `users/${userId}/transactions`), 
-            where("isRecurring", "!=", true) 
+            where("isRecurring", "==", false),
+            orderBy("timestamp", "desc")
         );
+        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
             setTransactions(fetchedTransactions);
         }, (error) => {
             console.error("Erro no listener de transações: ", error);
@@ -26,6 +28,7 @@ export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
     useEffect(() => {
         if (!userId) { setRecurring([]); return; }
+        // Consulta para transações recorrentes, ordenadas por descrição
         const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -55,33 +58,25 @@ export function useDebts(userId) {
 export function useBudgets(userId) {
     const [budgets, setBudgets] = useState([]);
     useEffect(() => {
-        if (!userId) {
-            setBudgets([]);
-            return;
-        }
+        if (!userId) { setBudgets([]); return; }
         const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0');
         const currentYear = new Date().getFullYear();
         const monthYear = `${currentYear}-${currentMonth}`;
-
         const q = query(collection(db, `users/${userId}/budgets`), where("month", "==", monthYear));
-        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
             console.error("Erro no listener de orçamentos: ", error);
         });
-        
         return () => unsubscribe();
     }, [userId]);
     return budgets;
 }
 
-// CORREÇÃO: A variável 'userId' foi adicionada como parâmetro aqui
 export function useGoals(userId) {
     const [goals, setGoals] = useState([]);
     useEffect(() => {
         if (!userId) { setGoals([]); return; }
-        // E usada aqui para montar o caminho correto
         const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
