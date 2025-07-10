@@ -10,7 +10,6 @@ export function useTransactions(userId) {
             collection(db, `users/${userId}/transactions`), 
             where("isRecurring", "!=", true) 
         );
-        
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
@@ -53,7 +52,6 @@ export function useDebts(userId) {
     return debts;
 }
 
-// NOVO HOOK ADICIONADO AQUI
 export function useBudgets(userId) {
     const [budgets, setBudgets] = useState([]);
     useEffect(() => {
@@ -76,4 +74,21 @@ export function useBudgets(userId) {
         return () => unsubscribe();
     }, [userId]);
     return budgets;
+}
+
+// CORREÇÃO: A variável 'userId' foi adicionada como parâmetro aqui
+export function useGoals(userId) {
+    const [goals, setGoals] = useState([]);
+    useEffect(() => {
+        if (!userId) { setGoals([]); return; }
+        // E usada aqui para montar o caminho correto
+        const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Erro no listener de metas: ", error);
+        });
+        return () => unsubscribe();
+    }, [userId]);
+    return goals;
 }
