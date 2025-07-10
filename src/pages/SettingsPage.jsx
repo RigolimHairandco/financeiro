@@ -9,10 +9,6 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
     const [budgetCategory, setBudgetCategory] = useState(expenseCategories[0]?.name || '');
     const [budgetAmount, setBudgetAmount] = useState('');
 
-    // CORREÇÃO: As listas de sugestões foram adicionadas aqui
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Poupança', 'Outros'];
-    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
-
     useEffect(() => {
         if (expenseCategories.length > 0 && !budgetCategory) {
             setBudgetCategory(expenseCategories[0].name);
@@ -51,7 +47,7 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
                         <div>
                             <label htmlFor="budget-category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
                             <select id="budget-category" value={budgetCategory} onChange={e => setBudgetCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                {expenseCategories.filter(cat => !budgetedCategoryNames.includes(cat.name) && cat.name !== 'Poupança').map(cat => (
+                                {expenseCategories.filter(cat => !budgetedCategoryNames.includes(cat.name)).map(cat => (
                                     <option key={cat.id} value={cat.name}>{cat.name}</option>
                                 ))}
                             </select>
