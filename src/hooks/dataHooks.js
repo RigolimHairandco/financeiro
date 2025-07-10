@@ -5,39 +5,22 @@ import { db } from '../firebase';
 export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
-        if (!userId) { 
-            console.log("HOOK 'useTransactions': userId não fornecido, retornando vazio.");
-            setTransactions([]); 
-            return; 
-        }
-        
-        console.log("HOOK 'useTransactions': A iniciar busca para o userId:", userId);
-        
+        if (!userId) { setTransactions([]); return; }
         const q = query(
-            collection(db, `users/${userId}/transactions`)
+            collection(db, `users/${userId}/transactions`), 
+            where("isRecurring", "!=", true) 
         );
-        
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            console.log(`HOOK 'useTransactions': Recebeu uma resposta. Número de documentos: ${snapshot.size}`);
-            
-            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            const normalTransactions = allTransactions.filter(t => t.isRecurring !== true);
-            console.log(`HOOK 'useTransactions': Encontradas ${normalTransactions.length} transações normais.`);
-
-            setTransactions(normalTransactions);
-
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
+            setTransactions(fetchedTransactions);
         }, (error) => {
-            // ESTA É A PARTE MAIS IMPORTANTE
-            console.error("!!!!!!!!!! ERRO NO LISTENER DE TRANSAÇÕES !!!!!!!!!!", error);
+            console.error("Erro no listener de transações: ", error);
         });
-
         return () => unsubscribe();
     }, [userId]);
     return transactions;
 }
-
-// Os outros hooks permanecem iguais, mas com logs de erro também.
 
 export function useRecurringTransactions(userId) {
     const [recurring, setRecurring] = useState([]);
@@ -47,7 +30,7 @@ export function useRecurringTransactions(userId) {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
-            console.error("!!!!!!!!!! ERRO NO LISTENER DE TRANSAÇÕES RECORRENTES !!!!!!!!!!", error);
+            console.error("Erro no listener de transações recorrentes: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -62,7 +45,7 @@ export function useDebts(userId) {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
-            console.error("!!!!!!!!!! ERRO NO LISTENER DE DÍVIDAS !!!!!!!!!!", error);
+            console.error("Erro no listener de dívidas: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -85,7 +68,7 @@ export function useBudgets(userId) {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
-            console.error("!!!!!!!!!! ERRO NO LISTENER DE ORÇAMENTOS !!!!!!!!!!", error);
+            console.error("Erro no listener de orçamentos: ", error);
         });
         
         return () => unsubscribe();
@@ -93,15 +76,17 @@ export function useBudgets(userId) {
     return budgets;
 }
 
+// CORREÇÃO: A variável 'userId' foi adicionada como parâmetro aqui
 export function useGoals(userId) {
     const [goals, setGoals] = useState([]);
     useEffect(() => {
         if (!userId) { setGoals([]); return; }
+        // E usada aqui para montar o caminho correto
         const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
-            console.error("!!!!!!!!!! ERRO NO LISTENER DE METAS !!!!!!!!!!", error);
+            console.error("Erro no listener de metas: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
