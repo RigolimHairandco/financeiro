@@ -15,7 +15,7 @@ export function useTransactions(userId) {
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             // Ordenamos por data aqui no código para evitar problemas com índices do Firestore
             fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
             setTransactions(fetchedTransactions);
