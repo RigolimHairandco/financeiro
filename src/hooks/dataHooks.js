@@ -6,19 +6,17 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
-        
-        // CORREÇÃO APLICADA AQUI:
-        // Em vez de "==", usamos "!=" para incluir transações antigas.
         const q = query(
             collection(db, `users/${userId}/transactions`), 
             where("isRecurring", "!=", true) 
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            // Ordenamos por data aqui no código para evitar problemas com índices do Firestore
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
             setTransactions(fetchedTransactions);
+        }, (error) => {
+            console.error("Erro no listener de transações: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -32,6 +30,8 @@ export function useRecurringTransactions(userId) {
         const q = query(collection(db, `users/${userId}/transactions`), where("isRecurring", "==", true), orderBy("description", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setRecurring(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Erro no listener de transações recorrentes: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
@@ -45,12 +45,15 @@ export function useDebts(userId) {
         const q = query(collection(db, `users/${userId}/debts`), orderBy("createdAt", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setDebts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Erro no listener de dívidas: ", error);
         });
         return () => unsubscribe();
     }, [userId]);
     return debts;
 }
 
+// NOVO HOOK ADICIONADO AQUI
 export function useBudgets(userId) {
     const [budgets, setBudgets] = useState([]);
     useEffect(() => {
@@ -62,27 +65,15 @@ export function useBudgets(userId) {
         const currentYear = new Date().getFullYear();
         const monthYear = `${currentYear}-${currentMonth}`;
 
-        const q = query(collection(db, `users/${userId}/budgets`));
+        const q = query(collection(db, `users/${userId}/budgets`), where("month", "==", monthYear));
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userBudgets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setBudgets(userBudgets.filter(b => b.month === monthYear));
+            setBudgets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Erro no listener de orçamentos: ", error);
         });
         
         return () => unsubscribe();
     }, [userId]);
     return budgets;
-}
-
-export function useGoals(userId) {
-    const [goals, setGoals] = useState([]);
-    useEffect(() => {
-        if (!userId) { setGoals([]); return; }
-        const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-        return () => unsubscribe();
-    }, [userId]);
-    return goals;
 }
