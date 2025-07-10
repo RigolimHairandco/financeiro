@@ -6,21 +6,14 @@ export function useTransactions(userId) {
     const [transactions, setTransactions] = useState([]);
     useEffect(() => {
         if (!userId) { setTransactions([]); return; }
-        
-        // CORREÇÃO: Removemos o filtro 'where' para buscar TODAS as transações
-        // e depois filtramos no código. Esta é a abordagem mais segura.
         const q = query(
-            collection(db, `users/${userId}/transactions`),
-            orderBy("timestamp", "desc") 
+            collection(db, `users/${userId}/transactions`), 
+            where("isRecurring", "!=", true) 
         );
-        
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Filtramos aqui para separar as recorrentes das normais
-            const normalTransactions = allTransactions.filter(t => t.isRecurring !== true);
-
-            setTransactions(normalTransactions);
+            const fetchedTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            fetchedTransactions.sort((a, b) => b.timestamp.toDate() - a.timestamp.toDate());
+            setTransactions(fetchedTransactions);
         }, (error) => {
             console.error("Erro no listener de transações: ", error);
         });
@@ -83,11 +76,13 @@ export function useBudgets(userId) {
     return budgets;
 }
 
+// CORREÇÃO: A variável 'userId' foi adicionada como parâmetro aqui
 export function useGoals(userId) {
     const [goals, setGoals] = useState([]);
     useEffect(() => {
         if (!userId) { setGoals([]); return; }
-        const q = query(collection(db, `users/${user.uid}/goals`), orderBy("targetDate", "asc"));
+        // E usada aqui para montar o caminho correto
+        const q = query(collection(db, `users/${userId}/goals`), orderBy("targetDate", "asc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => {
