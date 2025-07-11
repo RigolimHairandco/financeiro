@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc, getAuth, updatePassword } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useTransactions, useDebts, useBudgets, useRecurringTransactions, useGoals } from '../hooks/dataHooks.js';
 import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories.js';
@@ -50,6 +50,22 @@ const FinancialManager = ({ user, onLogout, setNotification }) => {
     const handleContributeToGoal = async (goal, amount) => { if (!goal || !amount || amount <= 0) return; const batch = writeBatch(db); const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransactionRef, { description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(), amount: amount, type: 'expense', category: 'Poupança', timestamp: Timestamp.now(), isRecurring: false }); const goalRef = doc(db, `users/${user.uid}/goals`, goal.id); const newCurrentAmount = goal.currentAmount + amount; batch.update(goalRef, { currentAmount: newCurrentAmount }); try { await batch.commit(); setGoalToContribute(null); setNotification({message: "Contribuição registada com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao contribuir para a meta:", e); setNotification({message: "Ocorreu um erro ao registar a contribuição.", type: 'error'}); } };
     const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId || data.linkedGoalId) { setNotification({message: "Não é possível editar uma transação de pagamento ou contribuição.", type: 'error'}); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); setNotification({message: "Transação atualizada!", type: 'success'}); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } setNotification({message: "Transação adicionada!", type: 'success'}); } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setNotification({message: "Ocorreu um erro ao guardar a transação.", type: 'error'}); } };
     
+    const handleUpdatePassword = async (newPassword) => {
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            setNotification({ message: 'Nenhum utilizador logado.', type: 'error' });
+            return;
+        }
+        try {
+            await updatePassword(currentUser, newPassword);
+            setNotification({ message: 'Senha atualizada com sucesso!', type: 'success' });
+        } catch (error) {
+            console.error("Erro ao atualizar senha:", error);
+            setNotification({ message: 'Erro ao atualizar a senha. Por segurança, pode ser necessário fazer logout e login novamente.', type: 'error' });
+        }
+    };
+    
     const filteredTransactions = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (filterPeriod === 'month') { return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
     const { totalIncome, totalExpenses, balance } = useMemo(() => { const income = filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0); const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0); return { totalIncome: income, totalExpenses: expenses, balance: income - expenses }; }, [filteredTransactions]);
     const activeDebts = useMemo(() => debts.filter(d => d.status === 'active'), [debts]);
@@ -68,9 +84,21 @@ const FinancialManager = ({ user, onLogout, setNotification }) => {
             
             {view === 'dashboard' && ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><SummaryCard title="Receitas (Mês)" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" /><SummaryCard title="Despesas (Mês)" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" /><SummaryCard title="Saldo (Mês)" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" /><SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" /></section>{recurringTransactions.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Lançamentos Recorrentes</h2> <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {recurringTransactions.map(item => ( <RecurringTransactionItem key={item.id} transaction={item} onLaunch={handleLaunchRecurring} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} hasBeenLaunched={launchedThisMonth.has(item.id)} /> ))} </div> </div> )}{budgetsWithSpending.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Acompanhamento de Orçamentos</h2> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {budgetsWithSpending.map(item => ( <BudgetProgress key={item.id} budget={item} currentSpending={item.spent} /> ))} </div> </div> )}<div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-2xl font-bold text-gray-800 mb-4">Distribuição de Despesas (Mês)</h2><ExpensePieChart data={filteredTransactions} /></div><div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8"><div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} expenseCategories={expenseCategories} incomeCategories={incomeCategories}/></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md h-full"><div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Histórico de Transações</h2><div className="flex bg-gray-100 rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Tudo</button></div></div>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg h-full flex flex-col justify-center"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação encontrada.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Metas de Poupança</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><GoalForm onSave={handleSaveGoal} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{goals.length === 0 ? <div className="text-center py-8"><Icon name="flag" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma meta criada.</p><p className="text-sm text-gray-400">Crie sua primeira meta para começar a poupar!</p></div> : <ul className="space-y-3">{goals.map(g => <GoalItem key={g.id} goal={g} onContribute={setGoalToContribute} onDelete={() => handleDeleteConfirmation(g.id, 'goal')} />)}</ul>}</div></div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div></div></div></main> )}
                {view === 'reports' && <Reports transactions={transactions} />}
-               {view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} budgets={budgets} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onUpdatePassword={handleUpdatePassword} />}
+               {view === 'settings' && 
+                   <SettingsPage 
+                       setView={setView} 
+                       expenseCategories={expenseCategories} 
+                       incomeCategories={incomeCategories}
+                       budgets={budgets}
+                       onAddCategory={handleAddCategory} 
+                       onDeleteCategory={handleDeleteCategory}
+                       onSaveBudget={handleSaveBudget}
+                       onDeleteBudget={handleDeleteBudget}
+                       onUpdatePassword={handleUpdatePassword} // Passando a função para o SettingsPage
+                   />
+               }
            </div>
        );
 };
 
-export default FinancialManager; // A LINHA QUE FALTAVA
+export default FinancialManager;
