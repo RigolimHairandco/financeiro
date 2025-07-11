@@ -20,6 +20,7 @@ import GoalItem from '../components/goals/GoalItem.jsx';
 import Reports from './Reports.jsx';
 import SettingsPage from './SettingsPage.jsx';
 
+// A prop 'setNotification' foi trocada de volta para 'setAlertMessage'
 const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
     const transactions = useTransactions(user.uid);
     const recurringTransactions = useRecurringTransactions(user.uid);
@@ -71,4 +72,4 @@ const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
                {view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} budgets={budgets} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} />}
            </div>
        );
-    };
+};
