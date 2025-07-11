@@ -1,111 +1,74 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useTransactions, useDebts, useBudgets, useRecurringTransactions, useGoals } from '../hooks/dataHooks.js';
+import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories.js';
 import Icon from '../components/ui/Icon.jsx';
-import CategoryIcon from '../components/ui/CategoryIcon.jsx';
+import ConfirmationModal from '../components/modals/ConfirmationModal.jsx';
+import PaymentModal from '../components/modals/PaymentModal.jsx';
+import ContributeToGoalModal from '../components/modals/ContributeToGoalModal.jsx';
+import SummaryCard from '../components/dashboard/SummaryCard.jsx';
+import ExpensePieChart from '../components/dashboard/ExpensePieChart.jsx';
+import BudgetProgress from '../components/dashboard/BudgetProgress.jsx';
+import TransactionForm from '../components/transactions/TransactionForm.jsx';
+import TransactionItem from '../components/transactions/TransactionItem.jsx';
+import RecurringTransactionItem from '../components/transactions/RecurringTransactionItem.jsx';
+import DebtForm from '../components/debts/DebtForm.jsx';
+import DebtItem from '../components/debts/DebtItem.jsx';
+import GoalForm from '../components/goals/GoalForm.jsx';
+import GoalItem from '../components/goals/GoalItem.jsx';
+import Reports from './Reports.jsx';
+import SettingsPage from './SettingsPage.jsx';
 
-const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCategory, onDeleteCategory, onSaveBudget, onDeleteBudget, budgets = [] }) => {
-    const [newExpenseCat, setNewExpenseCat] = useState('');
-    const [newIncomeCat, setNewIncomeCat] = useState('');
+const FinancialManager = ({ user, onLogout, setAlertMessage }) => {
+    const transactions = useTransactions(user.uid);
+    const recurringTransactions = useRecurringTransactions(user.uid);
+    const debts = useDebts(user.uid);
+    const expenseCategories = useExpenseCategories(user.uid);
+    const incomeCategories = useIncomeCategories(user.uid);
+    const budgets = useBudgets(user.uid);
+    const goals = useGoals(user.uid);
     
-    const [budgetCategory, setBudgetCategory] = useState(expenseCategories[0]?.name || '');
-    const [budgetAmount, setBudgetAmount] = useState('');
+    const [transactionToEdit, setTransactionToEdit] = useState(null);
+    const [itemToDelete, setItemToDelete] = useState({ id: null, type: null, data: null });
+    const [filterPeriod, setFilterPeriod] = useState('month');
+    const [debtToPay, setDebtToPay] = useState(null);
+    const [view, setView] = useState('dashboard');
+    const [goalToContribute, setGoalToContribute] = useState(null);
 
-    // CORREÇÃO: As listas de sugestões foram adicionadas aqui
-    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Poupança', 'Outros'];
-    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
-
-    useEffect(() => {
-        if (expenseCategories.length > 0 && !budgetCategory) {
-            setBudgetCategory(expenseCategories[0].name);
-        }
-    }, [expenseCategories, budgetCategory]);
-
-    const handleAddExpense = (e) => { e.preventDefault(); if (newExpenseCat.trim()) { onAddCategory('expenseCategories', newExpenseCat.trim()); setNewExpenseCat(''); } };
-    const handleAddIncome = (e) => { e.preventDefault(); if (newIncomeCat.trim()) { onAddCategory('incomeCategories', newIncomeCat.trim()); setNewIncomeCat(''); } };
+    const handleAddCategory = async (collectionName, categoryName) => { if (!categoryName) return; try { await addDoc(collection(db, `users/${user.uid}/${collectionName}`), { name: categoryName }); setAlertMessage({message: 'Categoria adicionada!', type: 'success'}); } catch (e) { console.error("Erro ao adicionar categoria:", e); setAlertMessage({message: "Erro ao adicionar a categoria.", type: 'error'}); } };
+    const handleDeleteCategory = async (collectionName, categoryId) => { if (!categoryId) return; try { await deleteDoc(doc(db, `users/${user.uid}/${collectionName}`, categoryId)); setAlertMessage({message: 'Categoria apagada!', type: 'success'}); } catch (e) { console.error("Erro ao apagar categoria:", e); setAlertMessage({message: "Erro ao apagar a categoria.", type: 'error'}); } };
+    const handleSaveBudget = async (budgetData) => { const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, '0'); const currentYear = new Date().getFullYear(); const budgetId = `${budgetData.categoryName.replace(/\s+/g, '-')}-${currentYear}-${currentMonth}`; try { const budgetRef = doc(db, `users/${user.uid}/budgets`, budgetId); await setDoc(budgetRef, { ...budgetData, month: `${currentYear}-${currentMonth}` }, { merge: true }); setAlertMessage({message: "Orçamento salvo com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao salvar orçamento:", e); setAlertMessage({message: "Ocorreu um erro ao salvar o orçamento.", type: 'error'}); } };
+    const handleDeleteBudget = async (budgetId) => { if (!budgetId) return; try { await deleteDoc(doc(db, `users/${user.uid}/budgets`, budgetId)); setAlertMessage({message: 'Orçamento apagado!', type: 'success'});} catch (e) { console.error("Erro ao apagar orçamento:", e); setAlertMessage({message: "Ocorreu um erro ao apagar o orçamento.", type: 'error'}); } };
+    const handleSaveDebt = async (data) => { try { await addDoc(collection(db, `users/${user.uid}/debts`), data); setAlertMessage({message: 'Dívida adicionada!', type: 'success'}); } catch (e) { console.error("Erro ao guardar dívida:", e); setAlertMessage({message: "Ocorreu um erro ao guardar a dívida.", type: 'error'}); } };
+    const handleDeleteConfirmation = (id, type, data = null) => setItemToDelete({id, type, data});
+    const handleDelete = async () => { if (!itemToDelete.id || !itemToDelete.type) return; const { id, type } = itemToDelete; const collectionName = `${type}s`; const docRef = doc(db, `users/${user.uid}/${collectionName}`, id); try { if (type === 'transaction' && itemToDelete.data?.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, itemToDelete.data.linkedDebtId); const debtDoc = await getDoc(debtRef); if (debtDoc.exists()) { const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount - itemToDelete.data.amount; await updateDoc(debtRef, { paidAmount: newPaidAmount < 0 ? 0 : newPaidAmount, status: 'active' }); } } else if (type === 'debt') { const transQuery = query(collection(db, `users/${user.uid}/transactions`), where("linkedDebtId", "==", id)); const transSnapshot = await getDocs(transQuery); if (!transSnapshot.empty) { setAlertMessage({message: "Apague primeiro os pagamentos associados a esta dívida.", type: 'error'}); setItemToDelete({id: null, type: null, data: null}); return; } } await deleteDoc(docRef); setAlertMessage({message: "Item apagado com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao apagar item:", e); setAlertMessage({message: "Ocorreu um erro ao apagar.", type: 'error'}); } finally { setItemToDelete({id: null, type: null, data: null}); } };
+    const handleMakePayment = async (paymentAmount) => { if (!debtToPay || !paymentAmount || paymentAmount <= 0) return; const batch = writeBatch(db); const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, { description: `PAGAMENTO: ${debtToPay.description}`.toUpperCase(), amount: paymentAmount, type: 'expense', category: 'Pagamento de Dívida', timestamp: Timestamp.now(), isRecurring: false, linkedDebtId: debtToPay.id }); const debtRef = doc(db, `users/${user.uid}/debts`, debtToPay.id); const newPaidAmount = debtToPay.paidAmount + paymentAmount; const newStatus = newPaidAmount >= debtToPay.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); try { await batch.commit(); setDebtToPay(null); setAlertMessage({message: "Pagamento registado!", type: 'success'}); } catch (e) { console.error("Erro ao processar pagamento:", e); setAlertMessage({message: "Ocorreu um erro ao processar o pagamento.", type: 'error'}); } };
+    const handleLaunchRecurring = async (recurringTransaction) => { const newTransaction = { ...recurringTransaction, isRecurring: false, timestamp: Timestamp.now(), recurringId: recurringTransaction.id }; delete newTransaction.id; try { await addDoc(collection(db, `users/${user.uid}/transactions`), newTransaction); setAlertMessage({message: `'${newTransaction.description}' foi lançada com sucesso!`, type: 'success'}); } catch (e) { console.error("Erro ao lançar transação recorrente:", e); setAlertMessage({message: "Ocorreu um erro ao lançar a transação.", type: 'error'}); } };
+    const handleSaveGoal = async (goalData) => { try { await addDoc(collection(db, `users/${user.uid}/goals`), goalData); setAlertMessage({message: "Meta salva com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao salvar meta:", e); setAlertMessage({message: "Ocorreu um erro ao salvar a meta.", type: 'error'}); } };
+    const handleDeleteGoal = async (goalId) => { if (!goalId) return; try { await deleteDoc(doc(db, `users/${user.uid}/goals`, goalId)); setAlertMessage({message: "Meta apagada!", type: 'success'}); } catch (e) { console.error("Erro ao apagar meta:", e); setAlertMessage({message: "Ocorreu um erro ao apagar a meta.", type: 'error'}); } };
+    const handleContributeToGoal = async (goal, amount) => { if (!goal || !amount || amount <= 0) return; const batch = writeBatch(db); const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransactionRef, { description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(), amount: amount, type: 'expense', category: 'Poupança', timestamp: Timestamp.now(), isRecurring: false }); const goalRef = doc(db, `users/${user.uid}/goals`, goal.id); const newCurrentAmount = goal.currentAmount + amount; batch.update(goalRef, { currentAmount: newCurrentAmount }); try { await batch.commit(); setGoalToContribute(null); setAlertMessage({message: "Contribuição registada com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao contribuir para a meta:", e); setAlertMessage({message: "Ocorreu um erro ao registar a contribuição.", type: 'error'}); } };
+    const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId || data.linkedGoalId) { setAlertMessage({message: "Não é possível editar uma transação de pagamento ou contribuição.", type: 'error'}); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); setAlertMessage({message: "Transação atualizada!", type: 'success'}); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } setAlertMessage({message: "Transação adicionada!", type: 'success'}); } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setAlertMessage({message: "Ocorreu um erro ao guardar a transação.", type: 'error'}); } };
     
-    const handleBudgetSubmit = (e) => {
-        e.preventDefault();
-        if (!budgetCategory || !budgetAmount || parseFloat(budgetAmount) <= 0) {
-            alert("Por favor, selecione uma categoria e um valor válido.");
-            return;
-        }
-        onSaveBudget({
-            categoryName: budgetCategory,
-            amount: parseFloat(budgetAmount)
-        });
-        setBudgetAmount('');
-    };
-    
-    const userExpenseNames = useMemo(() => expenseCategories.map(c => c.name), [expenseCategories]);
-    const userIncomeNames = useMemo(() => incomeCategories.map(c => c.name), [incomeCategories]);
-    const budgetedCategoryNames = useMemo(() => budgets.map(b => b.categoryName), [budgets]);
+    const filteredTransactions = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); if (filterPeriod === 'month') { return transactions.filter(t => t.timestamp && t.timestamp.toDate() >= startOfMonth); } return transactions; }, [transactions, filterPeriod]);
+    const { totalIncome, totalExpenses, balance } = useMemo(() => { const income = filteredTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0); const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0); return { totalIncome: income, totalExpenses: expenses, balance: income - expenses }; }, [filteredTransactions]);
+    const activeDebts = useMemo(() => debts.filter(d => d.status === 'active'), [debts]);
+    const totalActiveDebt = useMemo(() => activeDebts.reduce((acc, d) => acc + (d.totalAmount - d.paidAmount), 0), [activeDebts]);
+    const budgetsWithSpending = useMemo(() => { return budgets.map(budget => { const spent = filteredTransactions.filter(t => t.type === 'expense' && t.category === budget.categoryName).reduce((acc, t) => acc + t.amount, 0); return { ...budget, spent }; }); }, [budgets, filteredTransactions]);
+    const launchedThisMonth = useMemo(() => { const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); const launchedIds = new Set(); transactions.forEach(t => { if (t.recurringId && t.timestamp.toDate() >= startOfMonth) { launchedIds.add(t.recurringId); } }); return launchedIds; }, [transactions]);
 
     return (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <button onClick={() => setView('dashboard')} className="mb-6 inline-flex items-center gap-2 py-2 px-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"><Icon name="arrowleft" size={18} /> Voltar</button>
+        <div className="bg-gray-50 min-h-screen font-sans text-gray-900">
+            <ConfirmationModal isOpen={!!itemToDelete.id} onClose={() => setItemToDelete({ id: null, type: null, data: null })} onConfirm={handleDelete} title="Confirmar Exclusão" message="Tem a certeza que deseja apagar este item? Esta ação não pode ser desfeita." />
+            <PaymentModal isOpen={!!debtToPay} onClose={() => setDebtToPay(null)} onConfirm={handleMakePayment} debt={debtToPay} />
+            <ContributeToGoalModal isOpen={!!goalToContribute} onClose={() => setGoalToContribute(null)} onConfirm={handleContributeToGoal} goal={goalToContribute} />
+            <header className="bg-white shadow-sm sticky top-0 z-20 no-print">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center"><div className="flex items-center space-x-3"><button onClick={() => setView('dashboard')} className="flex items-center gap-3"><Icon name="wallet" className="text-indigo-600" size={32} /><h1 className="text-xl md:text-2xl font-bold text-gray-800">O Meu Gestor</h1></button></div><div className="flex items-center space-x-2 md:space-x-4"><button onClick={() => setView('reports')} title="Relatórios" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"><Icon name="barchart" size={20} /></button><button onClick={() => setView('settings')} title="Configurações" className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors"><Icon name="settings" size={20} /></button><div className="text-right"><p className="text-sm text-gray-600 truncate max-w-[150px] md:max-w-full">{user.email}</p></div><button onClick={onLogout} title="Sair" className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"><Icon name="logout" size={20} /></button></div></div>
+            </header>
             
-            <div className="mb-12">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Gerir Orçamentos</h1>
-                <p className="text-gray-600 mb-8">Defina seus orçamentos mensais por categoria de despesa.</p>
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                    <form onSubmit={handleBudgetSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <div>
-                            <label htmlFor="budget-category" className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
-                            <select id="budget-category" value={budgetCategory} onChange={e => setBudgetCategory(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                {expenseCategories.filter(cat => !budgetedCategoryNames.includes(cat.name) && cat.name !== 'Poupança').map(cat => (
-                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="budget-amount" className="block text-sm font-medium text-gray-600 mb-1">Valor do Orçamento (R$)</label>
-                            <input id="budget-amount" type="number" step="0.01" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} placeholder="500,00" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg" required />
-                        </div>
-                        <button type="submit" className="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Definir Orçamento</button>
-                    </form>
-                    <hr className="my-6" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Seus Orçamentos (Mês Atual)</h3>
-                    <ul className="space-y-3">
-                        {budgets.length > 0 ? budgets.map(b => (
-                            <li key={b.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <CategoryIcon category={b.categoryName} />
-                                    <span className="font-medium text-gray-800">{b.categoryName}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="font-semibold text-gray-800">{parseFloat(b.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                    <button onClick={() => onDeleteBudget(b.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition">
-                                        <Icon name="trash2" size={18} />
-                                    </button>
-                                </div>
-                            </li>
-                        )) : <p className="text-center text-gray-500 py-4">Nenhum orçamento definido para este mês.</p>}
-                    </ul>
-                </div>
-            </div>
-
-            <h1 className="text-3xl font-bold text-gray-800 mb-8"> Gerir Categorias </h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div>
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">Categorias de Despesa</h2>
-                    <div className="bg-white p-6 rounded-2xl shadow-md">
-                        <form onSubmit={handleAddExpense} className="flex gap-2 mb-4"><input type="text" value={newExpenseCat} onChange={(e) => setNewExpenseCat(e.target.value.toUpperCase())} placeholder="NOVA CATEGORIA" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg uppercase" required /><button type="submit" className="p-3 bg-red-500 text-white rounded-lg hover:bg-red-600"><Icon name="plus" /></button></form>
-                        <div className="mb-6"><h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3><div className="flex flex-wrap gap-2">{expenseSuggestions.filter(s => !userExpenseNames.includes(s)).map(suggestion => ( <button key={suggestion} onClick={() => onAddCategory('expenseCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"><CategoryIcon category={suggestion} /> {suggestion}</button> ))}</div></div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Categorias</h3>
-                        <ul className="space-y-3">{expenseCategories.length > 0 ? ( expenseCategories.map(cat => ( <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"><span className="font-medium text-gray-800">{cat.name}</span><button onClick={() => onDeleteCategory('expenseCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button></li> )) ) : ( <p className="text-center text-gray-500 py-4">Nenhuma categoria de despesa encontrada.</p> )}</ul>
-                    </div>
-                </div>
-                <div>
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">Fontes de Receita</h2>
-                    <div className="bg-white p-6 rounded-2xl shadow-md">
-                        <form onSubmit={handleAddIncome} className="flex gap-2 mb-4"><input type="text" value={newIncomeCat} onChange={(e) => setNewIncomeCat(e.target.value.toUpperCase())} placeholder="NOVA FONTE DE RECEITA" className="flex-grow p-3 bg-gray-50 border border-gray-200 rounded-lg uppercase" required /><button type="submit" className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600"><Icon name="plus" /></button></form>
-                        <div className="mb-6"><h3 className="text-sm font-semibold text-gray-600 mb-2">Sugestões</h3><div className="flex flex-wrap gap-2">{incomeSuggestions.filter(s => !userIncomeNames.includes(s)).map(suggestion => ( <button key={suggestion} onClick={() => onAddCategory('incomeCategories', suggestion)} className="flex items-center gap-2 text-sm py-1 px-3 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200"><CategoryIcon category={suggestion} /> {suggestion}</button>))}</div></div>
-                        <h3 className="text-lg font-semibold text-gray-700 mb-3">Suas Fontes</h3>
-                        <ul className="space-y-3">{incomeCategories.length > 0 ? ( incomeCategories.map(cat => ( <li key={cat.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"><span className="font-medium text-gray-800">{cat.name}</span><button onClick={() => onDeleteCategory('incomeCategories', cat.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Icon name="trash2" size={18} /></button></li> )) ) : ( <p className="text-center text-gray-500 py-4">Nenhuma fonte de receita encontrada.</p> )}</ul>
-                    </div>
-                </div>
-            </div>
-        </main>
-    );
-};
-
-export default SettingsPage;
+            {view === 'dashboard' && ( <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><SummaryCard title="Receitas (Mês)" value={totalIncome} iconName="arrowupcircle" colorClass="bg-green-100 text-green-800" /><SummaryCard title="Despesas (Mês)" value={totalExpenses} iconName="arrowdowncircle" colorClass="bg-red-100 text-red-800" /><SummaryCard title="Saldo (Mês)" value={balance} iconName="dollarsign" colorClass="bg-indigo-100 text-indigo-800" /><SummaryCard title="Dívidas Ativas" value={totalActiveDebt} iconName="banknote" colorClass="bg-orange-100 text-orange-800" /></section>{recurringTransactions.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Lançamentos Recorrentes</h2> <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {recurringTransactions.map(item => ( <RecurringTransactionItem key={item.id} transaction={item} onLaunch={handleLaunchRecurring} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} hasBeenLaunched={launchedThisMonth.has(item.id)} /> ))} </div> </div> )}{budgetsWithSpending.length > 0 && ( <div className="mb-8"> <h2 className="text-2xl font-bold text-gray-800 mb-4">Acompanhamento de Orçamentos</h2> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {budgetsWithSpending.map(item => ( <BudgetProgress key={item.id} budget={item} currentSpending={item.spent} /> ))} </div> </div> )}<div className="bg-white p-6 rounded-2xl shadow-md mb-8"><h2 className="text-2xl font-bold text-gray-800 mb-4">Distribuição de Despesas (Mês)</h2><ExpensePieChart data={filteredTransactions} /></div><div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8"><div className="lg:col-span-2"><TransactionForm onSave={handleSaveTransaction} transactionToEdit={transactionToEdit} setTransactionToEdit={setTransactionToEdit} activeDebts={activeDebts} userId={user.uid} expenseCategories={expenseCategories} incomeCategories={incomeCategories}/></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md h-full"><div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Histórico de Transações</h2><div className="flex bg-gray-100 rounded-full p-1 shadow-sm border"><button onClick={() => setFilterPeriod('month')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'month' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Mês Atual</button><button onClick={() => setFilterPeriod('all')} className={`px-4 py-1.5 rounded-full text-sm font-semibold transition ${filterPeriod === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-600'}`}>Tudo</button></div></div>{transactions.length === 0 ? <div className="text-center py-8 px-4 border-2 border-dashed rounded-lg h-full flex flex-col justify-center"><Icon name="receipttext" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma transação encontrada.</p></div> : <ul className="space-y-3 max-h-[500px] overflow-y-auto pr-2">{filteredTransactions.map(t => <TransactionItem key={t.id} transaction={t} onEdit={setTransactionToEdit} onDelete={(id, data) => handleDeleteConfirmation(id, 'transaction', data)} />)}</ul>}</div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Metas de Poupança</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><GoalForm onSave={handleSaveGoal} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{goals.length === 0 ? <div className="text-center py-8"><Icon name="flag" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma meta criada.</p><p className="text-sm text-gray-400">Crie sua primeira meta para começar a poupar!</p></div> : <ul className="space-y-3">{goals.map(g => <GoalItem key={g.id} goal={g} onContribute={setGoalToContribute} onDelete={() => handleDeleteConfirmation(g.id, 'goal')} />)}</ul>}</div></div></div></div><hr className="my-8" /><div><h2 className="text-2xl font-bold text-gray-800 mb-6">Dívidas Ativas</h2><div className="grid grid-cols-1 lg:grid-cols-5 gap-8"><div className="lg:col-span-2"><DebtForm onSave={handleSaveDebt} /></div><div className="lg:col-span-3"><div className="bg-white p-6 rounded-2xl shadow-md">{debts.length === 0 ? <div className="text-center py-8"><Icon name="landmark" size={40} className="mx-auto text-gray-300" /><p className="mt-2 text-gray-500 font-semibold">Nenhuma dívida ativa.</p><p className="text-sm text-gray-400">Adicione as suas dívidas para começar a acompanhá-las.</p></div> : <ul className="space-y-3">{activeDebts.map(d => <DebtItem key={d.id} debt={d} onPay={setDebtToPay} onDelete={(id, data) => handleDeleteConfirmation(id, 'debt', data)} />)}</ul>}</div></div></div></div></main> )}
+               {view === 'reports' && <Reports transactions={transactions} />}
+               {view === 'settings' && <SettingsPage setView={setView} expenseCategories={expenseCategories} incomeCategories={incomeCategories} budgets={budgets} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} />}
+           </div>
+       );
+    };
