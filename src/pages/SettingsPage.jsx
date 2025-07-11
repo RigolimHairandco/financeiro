@@ -9,9 +9,11 @@ const SettingsPage = ({ setView, expenseCategories, incomeCategories, onAddCateg
     const [budgetCategory, setBudgetCategory] = useState(expenseCategories[0]?.name || '');
     const [budgetAmount, setBudgetAmount] = useState('');
 
-    // Estados para o novo formulário de senha
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+
+    const expenseSuggestions = ['Moradia', 'Alimentação', 'Transporte - Combustível', 'Transporte - Manutenção', 'Lazer', 'Educação', 'Saúde', 'Contas', 'Vestuário', 'Poupança', 'Outros'];
+    const incomeSuggestions = ['Salário', 'Freelance', 'Fotografia', 'Investimentos', 'Vendas', 'Outros'];
 
     useEffect(() => {
         if (expenseCategories.length > 0 && !budgetCategory) {
