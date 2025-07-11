@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc, getAuth, updatePassword } from 'firebase/firestore';
-import { db, auth } from '../firebase'; // Importar 'auth'
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, getDoc, writeBatch, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
+import { getAuth, updatePassword } from 'firebase/auth';
+import { db } from '../firebase';
 import { useTransactions, useDebts, useBudgets, useRecurringTransactions, useGoals } from '../hooks/dataHooks.js';
 import { useExpenseCategories, useIncomeCategories } from '../hooks/useCategories.js';
 import Icon from '../components/ui/Icon.jsx';
@@ -50,8 +51,8 @@ const FinancialManager = ({ user, onLogout, setNotification }) => {
     const handleContributeToGoal = async (goal, amount) => { if (!goal || !amount || amount <= 0) return; const batch = writeBatch(db); const newTransactionRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransactionRef, { description: `CONTRIBUIÇÃO: ${goal.name}`.toUpperCase(), amount: amount, type: 'expense', category: 'Poupança', timestamp: Timestamp.now(), isRecurring: false }); const goalRef = doc(db, `users/${user.uid}/goals`, goal.id); const newCurrentAmount = goal.currentAmount + amount; batch.update(goalRef, { currentAmount: newCurrentAmount }); try { await batch.commit(); setGoalToContribute(null); setNotification({message: "Contribuição registada com sucesso!", type: 'success'}); } catch (e) { console.error("Erro ao contribuir para a meta:", e); setNotification({message: "Ocorreu um erro ao registar a contribuição.", type: 'error'}); } };
     const handleSaveTransaction = async (data, id) => { const batch = writeBatch(db); try { if (id) { if(data.linkedDebtId || data.linkedGoalId) { setNotification({message: "Não é possível editar uma transação de pagamento ou contribuição.", type: 'error'}); return; } const transRef = doc(db, `users/${user.uid}/transactions`, id); batch.update(transRef, data); setNotification({message: "Transação atualizada!", type: 'success'}); } else { const newTransRef = doc(collection(db, `users/${user.uid}/transactions`)); batch.set(newTransRef, data); if (data.category === 'Pagamento de Dívida' && data.linkedDebtId) { const debtRef = doc(db, `users/${user.uid}/debts`, data.linkedDebtId); const debtDoc = await getDoc(debtRef); if(debtDoc.exists()){ const debtData = debtDoc.data(); const newPaidAmount = debtData.paidAmount + data.amount; const newStatus = newPaidAmount >= debtData.totalAmount ? 'paid' : 'active'; batch.update(debtRef, { paidAmount: newPaidAmount, status: newStatus }); } } setNotification({message: "Transação adicionada!", type: 'success'}); } await batch.commit(); } catch (e) { console.error("Erro ao guardar transação:", e); setNotification({message: "Ocorreu um erro ao guardar a transação.", type: 'error'}); } };
     const handleUpdatePassword = async (newPassword) => {
-        const authInstance = getAuth();
-        const currentUser = authInstance.currentUser;
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
         if (!currentUser) {
             setNotification({ message: 'Nenhum utilizador logado.', type: 'error' });
             return;
